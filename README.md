@@ -79,19 +79,65 @@ aposentadoria a renda passiva é tratada como constante em termos reais, premiss
 O segundo fluxo entra no termo constante da acumulação, nunca no marginal, então o aporte
 necessário continua saindo por solução exata.
 
+## Análises
+
+Além da projeção, a calculadora responde as perguntas que vêm depois:
+
+- **O que mais move o seu plano** — mede, uma mudança de cada vez, quanto cada alavanca desloca a
+  renda mensal, e ordena por impacto. Costuma surpreender: adiar a aposentadoria quase sempre pesa
+  mais que aumentar o aporte.
+- **Quando você poderia parar** — a idade mais cedo que ainda fecha a meta com o aporte atual.
+  Adiar melhora por dois caminhos ao mesmo tempo (mais meses acumulando, menos meses a sustentar),
+  então a viabilidade é monótona na idade e uma busca binária basta.
+- **Se o mercado cair na hora errada** — risco de sequência de retornos: a mesma rentabilidade
+  média machuca muito mais quando a queda chega logo no começo do usufruto, porque o saque passa a
+  incidir sobre um patrimônio já reduzido.
+- **Taxa de retirada** — quanto do patrimônio sai no primeiro ano, comparado à referência de 4%.
+
+## Gráficos
+
+Sem biblioteca: SVG e CSS puros, desenhados a partir das cores por papel, então um mesmo gráfico
+responde ao tema claro e ao escuro sem código condicional.
+
+A paleta categórica foi verificada com um validador de contraste e de visão de cores — azul, aqua
+e laranja são o único trio que passa em **todos** os pares nos dois temas. Nenhuma informação
+depende só da cor: toda série tem rótulo direto ou legenda, as barras divergentes trazem o valor
+com sinal, e a tabela ano a ano repete os mesmos números.
+
+No gráfico de patrimônio a carteira é uma entidade só e usa um único tom do começo ao fim; a fase
+de usufruto se distingue pelo traço tracejado, pela régua vertical e pelo rótulo — nunca por uma
+segunda cor, que seria lida como outra série.
+
+As animações são discretas e todas passam por `prefers-reduced-motion`: a área do gráfico se abre
+da esquerda para a direita, os números transitam até o novo valor, e as barras acompanham.
+
 ## Estrutura
 
 ```
-index.html            página única
-assets/styles.css     estilos, com tema claro e escuro
-src/retirement.js     motor de cálculo — puro, sem DOM, é o que os testes exercitam
-src/app.js            leitura do formulário, gráfico SVG, tabela e cartões
-scripts/serve.js      servidor estático de desenvolvimento
-test/                 testes do motor de cálculo
+index.html               página única
+assets/styles.css        estilos, com tema claro e escuro
+src/retirement.js        motor de cálculo — puro, sem DOM
+src/analysis.js          análises derivadas — sensibilidade, risco, taxa de retirada
+src/charts.js            gráficos em SVG e CSS
+src/format.js            formatação em pt-BR
+src/app.js               leitura do formulário e orquestração
+scripts/serve.js         servidor estático de desenvolvimento
+scripts/build-artifact.js gera a versão de arquivo único
+test/                    testes do motor e das análises
 ```
 
-A separação importa: `src/retirement.js` não conhece DOM nem formatação, e `src/app.js` não
-contém nenhuma regra financeira.
+A separação importa: `retirement.js` e `analysis.js` não conhecem DOM nem formatação, e `app.js`
+não contém nenhuma regra financeira.
+
+## Versão de arquivo único
+
+```bash
+npm run build      # gera dist/aposentadoria.html
+```
+
+A página publicada e o repositório eram mantidos à mão em paralelo, e cada mudança precisava ser
+portada duas vezes — um convite a divergirem. Agora a fonte é sempre `index.html` e os módulos que
+ele carrega; o arquivo único é derivado.
 
 ## Premissas e limites
 

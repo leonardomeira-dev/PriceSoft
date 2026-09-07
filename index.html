@@ -6,7 +6,13 @@
     <title>Calculadora de Aposentadoria — PriceSoft</title>
     <meta
       name="description"
-      content="Projete seu patrimônio, a renda mensal sustentável na aposentadoria e o aporte necessário para chegar lá, tudo em valores de hoje."
+      content="Projete patrimônio, renda sustentável e aporte necessário, com análise de sensibilidade e risco de queda de mercado — tudo em valores de hoje."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap"
     />
     <link rel="stylesheet" href="assets/styles.css" />
     <link
@@ -16,145 +22,107 @@
   </head>
   <body>
     <div class="page">
-      <header class="page-header">
+      <header class="masthead">
+        <span class="eyebrow">Planejamento financeiro · valores reais</span>
         <h1>Calculadora de aposentadoria</h1>
-        <p>
-          Descubra quanto você terá, que renda mensal esse patrimônio sustenta e quanto precisa
-          aportar para alcançar a renda que deseja. Todos os valores são apresentados em
-          <strong>poder de compra de hoje</strong> — a inflação já está descontada.
+        <p class="standfirst">
+          Quanto você terá, que renda mensal esse patrimônio sustenta e quanto precisa aportar para
+          chegar lá — contando imóveis, negócio e a renda passiva que você já recebe. Tudo em
+          <strong>poder de compra de hoje</strong>: a inflação já está descontada.
         </p>
       </header>
 
       <div class="layout">
-        <!-- ---------- Entradas ---------- -->
-        <form class="panel form-panel" id="plan-form" novalidate>
-          <div class="errors" id="errors" role="alert" hidden>
-            <ul id="error-list"></ul>
-          </div>
+        <form class="controls" id="form" novalidate>
+          <div class="errors" id="errors" role="alert" hidden><ul id="error-list"></ul></div>
 
           <fieldset>
             <legend>Seu perfil</legend>
-
             <div class="field">
               <label for="currentAge">Idade atual</label>
-              <div class="input-wrap">
-                <input id="currentAge" name="currentAge" type="number" min="0" max="110" step="1" value="30" />
+              <div class="control">
+                <input id="currentAge" type="number" min="0" max="110" step="1" value="30" />
                 <span class="affix">anos</span>
               </div>
             </div>
-
             <div class="field">
               <label for="retirementAge">Quero me aposentar aos</label>
-              <div class="input-wrap">
-                <input id="retirementAge" name="retirementAge" type="number" min="1" max="110" step="1" value="65" />
+              <div class="control">
+                <input id="retirementAge" type="number" min="1" max="110" step="1" value="65" />
                 <span class="affix">anos</span>
               </div>
             </div>
-
             <div class="field">
               <label for="endAge">A renda precisa durar até os</label>
-              <div class="input-wrap">
-                <input id="endAge" name="endAge" type="number" min="2" max="120" step="1" value="90" />
+              <div class="control">
+                <input id="endAge" type="number" min="2" max="120" step="1" value="90" />
                 <span class="affix">anos</span>
               </div>
-              <span class="hint">Use uma expectativa de vida conservadora — sobreviver ao dinheiro é o risco.</span>
+              <span class="hint">Use uma expectativa conservadora — sobreviver ao dinheiro é o risco.</span>
             </div>
           </fieldset>
 
           <fieldset>
             <legend>Acumulação</legend>
-
             <div class="field">
               <label for="initialBalance">Patrimônio já investido</label>
-              <div class="input-wrap">
+              <div class="control">
                 <span class="affix">R$</span>
-                <input id="initialBalance" name="initialBalance" type="number" min="0" step="1000" value="50000" />
+                <input id="initialBalance" type="number" min="0" step="1000" value="50000" />
               </div>
             </div>
-
             <div class="field">
               <label for="monthlyContribution">Aporte mensal</label>
-              <div class="input-wrap">
+              <div class="control">
                 <span class="affix">R$</span>
-                <input
-                  id="monthlyContribution"
-                  name="monthlyContribution"
-                  type="number"
-                  min="0"
-                  step="100"
-                  value="1500"
-                />
+                <input id="monthlyContribution" type="number" min="0" step="100" value="1500" />
               </div>
             </div>
-
             <div class="field">
-              <label class="checkbox" for="indexContribution">
-                <input id="indexContribution" name="indexContribution" type="checkbox" checked />
+              <label class="switch" for="indexContribution">
+                <input id="indexContribution" type="checkbox" checked />
                 <span>Corrijo o aporte pela inflação todo ano</span>
               </label>
-              <span class="hint">
-                Sem correção, o aporte perde poder de compra e o patrimônio final cai.
-              </span>
+              <span class="hint">Sem correção, o aporte perde poder de compra e o patrimônio final cai.</span>
             </div>
           </fieldset>
 
           <fieldset>
             <legend>Patrimônio produtivo</legend>
-
             <div class="field">
               <label for="productiveAssets">Imóveis, negócio, participações</label>
-              <div class="input-wrap">
+              <div class="control">
                 <span class="affix">R$</span>
-                <input id="productiveAssets" name="productiveAssets" type="number" min="0" step="10000" value="0" />
+                <input id="productiveAssets" type="number" min="0" step="10000" value="0" />
               </div>
-              <span class="hint">
-                Valor de mercado hoje. Diferente da carteira: não é consumido, continua rendendo.
-              </span>
+              <span class="hint">Valor de mercado hoje. Não é consumido: continua rendendo.</span>
             </div>
-
             <div class="field">
               <label for="passiveIncome">Renda passiva que já recebo</label>
-              <div class="input-wrap">
+              <div class="control">
                 <span class="affix">R$</span>
-                <input id="passiveIncome" name="passiveIncome" type="number" min="0" step="500" value="0" />
+                <input id="passiveIncome" type="number" min="0" step="500" value="0" />
                 <span class="affix">/ mês</span>
               </div>
               <span class="hint">Aluguéis, pró-labore de sócio, dividendos recorrentes.</span>
             </div>
-
             <div class="field">
               <label for="productiveRealGrowth">Valorização acima da inflação</label>
-              <div class="input-wrap">
-                <input
-                  id="productiveRealGrowth"
-                  name="productiveRealGrowth"
-                  type="number"
-                  min="-10"
-                  max="15"
-                  step="0.25"
-                  value="0"
-                />
+              <div class="control">
+                <input id="productiveRealGrowth" type="number" min="-10" max="15" step="0.25" value="0" />
                 <span class="affix">% a.a. real</span>
               </div>
-              <span class="hint">
-                Zero mantém o poder de compra. A renda passiva acompanha o valor do bem.
-              </span>
+              <span class="hint">Zero mantém o poder de compra. A renda acompanha o valor do bem.</span>
             </div>
-
             <div class="field">
-              <label class="checkbox" for="reinvestPassiveIncome">
-                <input id="reinvestPassiveIncome" name="reinvestPassiveIncome" type="checkbox" checked />
+              <label class="switch" for="reinvestPassiveIncome">
+                <input id="reinvestPassiveIncome" type="checkbox" checked />
                 <span>Reinvisto a renda passiva enquanto trabalho</span>
               </label>
             </div>
-
             <div class="field">
-              <label class="checkbox" for="sellProductiveAtRetirement">
-                <input
-                  id="sellProductiveAtRetirement"
-                  name="sellProductiveAtRetirement"
-                  type="checkbox"
-                />
+              <label class="switch" for="sellProductiveAtRetirement">
+                <input id="sellProductiveAtRetirement" type="checkbox" />
                 <span>Vendo o patrimônio produtivo ao me aposentar</span>
               </label>
               <span class="hint">Vira carteira para consumir — e a renda passiva acaba.</span>
@@ -163,44 +131,25 @@
 
           <fieldset>
             <legend>Premissas de mercado</legend>
-
             <div class="field">
               <label for="accumulationReturn">Rentabilidade até me aposentar</label>
-              <div class="input-wrap">
-                <input
-                  id="accumulationReturn"
-                  name="accumulationReturn"
-                  type="number"
-                  min="-20"
-                  max="40"
-                  step="0.25"
-                  value="9"
-                />
-                <span class="affix">% a.a. nominal</span>
+              <div class="control">
+                <input id="accumulationReturn" type="number" min="-20" max="40" step="0.25" value="9" />
+                <span class="affix">% a.a.</span>
               </div>
             </div>
-
             <div class="field">
               <label for="retirementReturn">Rentabilidade depois de aposentado</label>
-              <div class="input-wrap">
-                <input
-                  id="retirementReturn"
-                  name="retirementReturn"
-                  type="number"
-                  min="-20"
-                  max="40"
-                  step="0.25"
-                  value="6"
-                />
-                <span class="affix">% a.a. nominal</span>
+              <div class="control">
+                <input id="retirementReturn" type="number" min="-20" max="40" step="0.25" value="6" />
+                <span class="affix">% a.a.</span>
               </div>
               <span class="hint">Costuma ser menor: a carteira fica mais conservadora.</span>
             </div>
-
             <div class="field">
               <label for="inflation">Inflação esperada</label>
-              <div class="input-wrap">
-                <input id="inflation" name="inflation" type="number" min="-5" max="40" step="0.25" value="4" />
+              <div class="control">
+                <input id="inflation" type="number" min="-5" max="40" step="0.25" value="4" />
                 <span class="affix">% a.a.</span>
               </div>
             </div>
@@ -208,153 +157,174 @@
 
           <fieldset>
             <legend>Sua meta</legend>
-
             <div class="field">
               <label for="desiredMonthlyIncome">Renda mensal desejada</label>
-              <div class="input-wrap">
+              <div class="control">
                 <span class="affix">R$</span>
-                <input
-                  id="desiredMonthlyIncome"
-                  name="desiredMonthlyIncome"
-                  type="number"
-                  min="0"
-                  step="500"
-                  value="8000"
-                />
+                <input id="desiredMonthlyIncome" type="number" min="0" step="500" value="8000" />
               </div>
               <span class="hint">Em valores de hoje, somando todas as fontes.</span>
             </div>
-
             <div class="field">
-              <label for="otherMonthlyIncome">Outras rendas (INSS, aluguel…)</label>
-              <div class="input-wrap">
+              <label for="otherMonthlyIncome">Outras rendas (INSS, previdência)</label>
+              <div class="control">
                 <span class="affix">R$</span>
-                <input
-                  id="otherMonthlyIncome"
-                  name="otherMonthlyIncome"
-                  type="number"
-                  min="0"
-                  step="500"
-                  value="2000"
-                />
+                <input id="otherMonthlyIncome" type="number" min="0" step="500" value="2000" />
               </div>
             </div>
-
             <div class="field">
               <label for="legacy">Quero deixar de herança</label>
-              <div class="input-wrap">
+              <div class="control">
                 <span class="affix">R$</span>
-                <input id="legacy" name="legacy" type="number" min="0" step="10000" value="0" />
+                <input id="legacy" type="number" min="0" step="10000" value="0" />
               </div>
             </div>
           </fieldset>
 
-          <div class="form-actions">
-            <button type="reset" id="reset">Restaurar valores padrão</button>
+          <div class="actions">
+            <button type="button" id="reset">Restaurar valores padrão</button>
           </div>
         </form>
 
-        <!-- ---------- Resultados ---------- -->
         <div class="results" id="results" aria-live="polite">
-          <section class="panel verdict" id="verdict">
+          <section class="verdict" id="verdict">
             <h2 id="verdict-title"></h2>
             <p id="verdict-detail"></p>
           </section>
 
-          <div class="cards">
-            <article class="panel card" id="card-income">
-              <span class="card-label">Renda mensal projetada</span>
-              <span class="card-value" id="value-income"></span>
-              <span class="card-note" id="note-income"></span>
+          <div class="metrics">
+            <article class="metric" id="m-income">
+              <span class="metric-label">Renda mensal projetada</span>
+              <span class="metric-value" id="v-income"></span>
+              <span class="metric-note" id="n-income"></span>
             </article>
-
-            <article class="panel card">
-              <span class="card-label">Patrimônio ao se aposentar</span>
-              <span class="card-value" id="value-balance"></span>
-              <span class="card-note" id="note-balance"></span>
+            <article class="metric">
+              <span class="metric-label">Patrimônio ao se aposentar</span>
+              <span class="metric-value" id="v-balance"></span>
+              <span class="metric-note" id="n-balance"></span>
             </article>
-
-            <article class="panel card">
-              <span class="card-label">Patrimônio necessário</span>
-              <span class="card-value" id="value-target"></span>
-              <span class="card-note" id="note-target"></span>
+            <article class="metric">
+              <span class="metric-label">Patrimônio necessário</span>
+              <span class="metric-value" id="v-target"></span>
+              <span class="metric-note" id="n-target"></span>
             </article>
-
-            <article class="panel card" id="card-contribution">
-              <span class="card-label">Aporte mensal necessário</span>
-              <span class="card-value" id="value-contribution"></span>
-              <span class="card-note" id="note-contribution"></span>
+            <article class="metric" id="m-earliest">
+              <span class="metric-label">Poderia parar aos</span>
+              <span class="metric-value" id="v-earliest"></span>
+              <span class="metric-note" id="n-earliest"></span>
             </article>
           </div>
 
-          <section class="panel chart-panel">
-            <div class="section-head">
+          <section class="block">
+            <div class="block-head">
               <h2>Evolução do patrimônio</h2>
-              <div class="legend">
-                <span><i></i> Acumulação</span>
-                <span><i class="swatch-retire"></i> Aposentadoria</span>
-                <span id="key-productive" hidden><i class="swatch-productive"></i> Patrimônio produtivo</span>
+              <div class="key">
+                <span><i></i> Carteira financeira</span>
+                <span id="key-productive" hidden><i class="k-productive"></i> Patrimônio produtivo</span>
               </div>
             </div>
-            <svg
-              class="chart"
-              id="chart"
-              viewBox="0 0 860 320"
-              role="img"
-              aria-labelledby="chart-title"
-            >
-              <title id="chart-title">
-                Gráfico do saldo acumulado ao longo da vida. Os mesmos números estão na tabela
-                ano a ano abaixo.
+            <svg class="chart" id="chart" viewBox="0 0 880 320" role="img" aria-labelledby="chart-desc">
+              <title id="chart-desc">
+                Saldo acumulado ao longo da vida. A linha tracejada marca a fase de usufruto. Os
+                mesmos números aparecem na tabela ano a ano abaixo.
               </title>
             </svg>
-            <p class="footnote" id="chart-note"></p>
+            <p class="caption" id="chart-caption"></p>
           </section>
 
-          <section class="panel breakdown">
-            <div class="section-head">
-              <h2>De onde vem o patrimônio</h2>
+          <div class="pair">
+            <section class="block">
+              <div class="block-head">
+                <h2>De onde vem a renda</h2>
+                <span class="sub">por mês, na aposentadoria</span>
+              </div>
+              <div class="mix" id="mix" aria-hidden="true"></div>
+              <dl class="mix-list" id="mix-list"></dl>
+            </section>
+
+            <section class="block">
+              <div class="block-head">
+                <h2>De onde vem o patrimônio</h2>
+                <span class="sub">acumulado até se aposentar</span>
+              </div>
+              <div class="stack" aria-hidden="true">
+                <span class="s-initial" id="s-initial"></span>
+                <span class="s-paid" id="s-paid"></span>
+                <span class="s-passive" id="s-passive"></span>
+                <span class="s-growth" id="s-growth"></span>
+              </div>
+              <dl class="parts">
+                <div>
+                  <dt data-part="initial">Já investido</dt>
+                  <dd id="v-initial"></dd>
+                </div>
+                <div>
+                  <dt data-part="paid">Aportes futuros</dt>
+                  <dd id="v-paid"></dd>
+                </div>
+                <div id="part-passive" hidden>
+                  <dt data-part="passive">Renda passiva reinvestida</dt>
+                  <dd id="v-passive"></dd>
+                </div>
+                <div>
+                  <dt data-part="growth">Rendimentos reais</dt>
+                  <dd id="v-growth"></dd>
+                </div>
+              </dl>
+            </section>
+          </div>
+
+          <section class="block">
+            <div class="block-head">
+              <h2>O que mais move o seu plano</h2>
+              <span class="sub">efeito na renda mensal, uma mudança de cada vez</span>
             </div>
-            <div class="stack-bar" id="stack-bar" aria-hidden="true">
-              <span class="seg-initial" id="seg-initial"></span>
-              <span class="seg-contributed" id="seg-contributed"></span>
-              <span class="seg-passive" id="seg-passive"></span>
-              <span class="seg-growth" id="seg-growth"></span>
-            </div>
-            <dl class="breakdown-list">
-              <div>
-                <dt data-seg="initial">Já investido</dt>
-                <dd id="value-initial"></dd>
-              </div>
-              <div>
-                <dt data-seg="contributed">Aportes futuros</dt>
-                <dd id="value-contributed"></dd>
-              </div>
-              <div id="part-passive" hidden>
-                <dt data-seg="passive">Renda passiva reinvestida</dt>
-                <dd id="value-passive"></dd>
-              </div>
-              <div>
-                <dt data-seg="growth">Rendimentos reais</dt>
-                <dd id="value-growth"></dd>
-              </div>
-            </dl>
+            <div class="levers" id="levers"></div>
+            <p class="caption" id="levers-caption"></p>
           </section>
 
-          <details class="panel">
+          <div class="pair">
+            <section class="block">
+              <div class="block-head">
+                <h2>Se o mercado cair na hora errada</h2>
+                <span class="sub">queda no ano em que você se aposenta</span>
+              </div>
+              <div class="crashes" id="crashes"></div>
+              <p class="caption" id="crashes-caption"></p>
+            </section>
+
+            <section class="block">
+              <div class="block-head">
+                <h2>Taxa de retirada</h2>
+                <span class="sub">primeiro ano de aposentadoria</span>
+              </div>
+              <div class="gauge">
+                <span class="metric-value" id="v-rate"></span>
+                <div class="gauge-track">
+                  <span class="gauge-needle" id="rate-needle"></span>
+                </div>
+                <div class="gauge-scale">
+                  <span>0%</span>
+                  <span>4% — referência</span>
+                  <span>8%+</span>
+                </div>
+              </div>
+              <p class="caption" id="rate-caption"></p>
+            </section>
+          </div>
+
+          <details>
             <summary>Premissas usadas no cálculo</summary>
-            <div class="details-body">
-              <dl class="assumption-list" id="assumptions"></dl>
-            </div>
+            <div class="details-body"><dl class="assumptions" id="assumptions"></dl></div>
           </details>
 
-          <details class="panel">
+          <details>
             <summary>Projeção ano a ano</summary>
             <div class="details-body">
               <div class="table-scroll">
                 <table>
-                  <caption class="visually-hidden">
-                    Saldo, aportes, retiradas e rendimentos em cada ano, em valores de hoje.
+                  <caption class="sr-only">
+                    Saldo, aportes, retiradas e rendimentos de cada ano, em valores de hoje.
                   </caption>
                   <thead>
                     <tr>
@@ -366,7 +336,7 @@
                       <th scope="col" id="th-productive" hidden>Patrimônio produtivo</th>
                     </tr>
                   </thead>
-                  <tbody id="table-body"></tbody>
+                  <tbody id="rows"></tbody>
                 </table>
               </div>
             </div>
@@ -374,12 +344,11 @@
         </div>
       </div>
 
-      <footer class="page-footer">
-        <p>
-          Ferramenta educativa de planejamento. As projeções assumem rentabilidade constante e não
-          consideram impostos, taxas de administração ou mudanças de regra da previdência — os
-          resultados reais vão variar. Não constitui recomendação de investimento.
-        </p>
+      <footer class="colophon">
+        Ferramenta educativa de planejamento. As projeções assumem rentabilidade e inflação
+        constantes ao longo de décadas — servem para comparar cenários, não para prever o futuro.
+        Não consideram imposto de renda, taxas de administração, come-cotas nem mudanças de regra da
+        previdência. Não constitui recomendação de investimento.
       </footer>
     </div>
 

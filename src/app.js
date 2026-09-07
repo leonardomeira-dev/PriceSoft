@@ -1,375 +1,300 @@
 /**
- * Camada de interface da calculadora de aposentadoria.
+ * Camada de interface.
  *
- * Lê o formulário, chama o motor de cálculo em `retirement.js` e desenha os
- * resultados: cartões, gráfico SVG, composição do patrimônio e tabela anual.
- * Nenhuma regra financeira mora aqui — só apresentação.
+ * Lê o formulário, chama o motor (`retirement.js`) e as análises
+ * (`analysis.js`), e entrega o resultado aos gráficos (`charts.js`). Nenhuma
+ * regra financeira mora aqui — só apresentação e animação.
  */
 
 import { project, validate } from './retirement.js';
+import {
+  crashScenarios,
+  earliestFeasibleRetirementAge,
+  incomeSources,
+  sensitivity,
+  withdrawalRate,
+} from './analysis.js';
+import {
+  drawCrashScenarios,
+  drawIncomeMix,
+  drawSensitivity,
+  drawWealthChart,
+  prefersReducedMotion,
+} from './charts.js';
+import { anos, money, moneyUp, pct } from './format.js';
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
+const $ = (id) => document.getElementById(id);
+const setText = (id, value) => { $(id).textContent = value; };
 
-/* ---------- Formatação ---------- */
-
-const currency = new Intl.NumberFormat('pt-BR', {
-  style: 'currency',
-  currency: 'BRL',
-  maximumFractionDigits: 0,
-});
-
-const currencyCompact = new Intl.NumberFormat('pt-BR', {
-  style: 'currency',
-  currency: 'BRL',
-  notation: 'compact',
-  maximumFractionDigits: 1,
-});
-
-const percent = new Intl.NumberFormat('pt-BR', {
-  style: 'percent',
-  maximumFractionDigits: 2,
-});
-
-/** Formata um valor monetário, protegendo contra resultados não finitos. */
-const money = (value) => (Number.isFinite(value) ? currency.format(value) : '—');
+/* ---------- Números animados ---------- */
 
 /**
- * Formata exigências e faltas arredondando para cima.
+ * Anima um valor numérico até o novo alvo.
  *
- * Os valores são exibidos sem centavos. Arredondar um requisito para o mais
- * próximo o deixa abaixo do necessário quase metade das vezes — quem digitasse
- * de volta o aporte sugerido veria a calculadora dizer que ainda falta dinheiro.
- * Para cima, seguir a recomendação sempre fecha a conta.
+ * O valor corrente fica guardado no próprio elemento, então digitar rápido
+ * encadeia as transições em vez de fazer o número piscar. Com movimento
+ * reduzido, escreve direto.
+ *
+ * @param {string} id id do elemento
+ * @param {number} value valor alvo
+ * @param {(n: number) => string} format formatador
  */
-const moneyUp = (value) => (Number.isFinite(value) ? currency.format(Math.ceil(value)) : '—');
+function setNumber(id, value, format = money) {
+  const element = $(id);
+  const from = Number.isFinite(element._value) ? element._value : null;
 
-/** Formata uma quantidade de anos com a concordância correta. */
-const years = (count) => `${count} ${count === 1 ? 'ano' : 'anos'}`;
+  if (element._frame) cancelAnimationFrame(element._frame);
 
-/* ---------- Elementos ---------- */
+  if (from === null || !Number.isFinite(value) || prefersReducedMotion() || from === value) {
+    element._value = value;
+    element.textContent = format(value);
+    return;
+  }
 
-const form = document.getElementById('plan-form');
-const errorBox = document.getElementById('errors');
-const errorList = document.getElementById('error-list');
-const results = document.getElementById('results');
-const chart = document.getElementById('chart');
-const chartTitle = document.getElementById('chart-title');
+  const duration = 420;
+  const start = performance.now();
+  // Desaceleração cúbica: rápida no começo, assentando no fim.
+  const ease = (t) => 1 - Math.pow(1 - t, 3);
 
-const text = (id, value) => {
-  document.getElementById(id).textContent = value;
-};
+  const step = (now) => {
+    const progress = Math.min((now - start) / duration, 1);
+    const current = from + (value - from) * ease(progress);
+    element.textContent = format(current);
+    if (progress < 1) element._frame = requestAnimationFrame(step);
+    else {
+      element._value = value;
+      element.textContent = format(value);
+      element._frame = null;
+    }
+  };
+  element._frame = requestAnimationFrame(step);
+}
 
 /* ---------- Leitura do formulário ---------- */
 
-const number = (name) => {
-  const value = Number.parseFloat(form.elements[name].value);
+const FIELDS = [
+  'currentAge', 'retirementAge', 'endAge', 'initialBalance', 'monthlyContribution',
+  'accumulationReturn', 'retirementReturn', 'inflation',
+  'desiredMonthlyIncome', 'otherMonthlyIncome', 'legacy',
+  'productiveAssets', 'passiveIncome', 'productiveRealGrowth',
+];
+const SWITCHES = ['indexContribution', 'reinvestPassiveIncome', 'sellProductiveAtRetirement'];
+
+const DEFAULTS = Object.fromEntries(FIELDS.map((id) => [id, $(id).value]));
+const SWITCH_DEFAULTS = Object.fromEntries(SWITCHES.map((id) => [id, $(id).checked]));
+const STORE_KEY = 'plano-aposentadoria';
+
+const num = (id) => {
+  const value = Number.parseFloat($(id).value);
   return Number.isFinite(value) ? value : Number.NaN;
 };
 
-/** Percentuais entram como 9 (por cento) e saem como 0.09 (decimal). */
-const rate = (name) => number(name) / 100;
+const readPlan = () => ({
+  currentAge: Math.round(num('currentAge')),
+  retirementAge: Math.round(num('retirementAge')),
+  endAge: Math.round(num('endAge')),
+  initialBalance: num('initialBalance'),
+  monthlyContribution: num('monthlyContribution'),
+  accumulationReturn: num('accumulationReturn') / 100,
+  retirementReturn: num('retirementReturn') / 100,
+  inflation: num('inflation') / 100,
+  indexContribution: $('indexContribution').checked,
+  desiredMonthlyIncome: num('desiredMonthlyIncome'),
+  otherMonthlyIncome: num('otherMonthlyIncome'),
+  legacy: num('legacy'),
+  productiveAssets: num('productiveAssets'),
+  passiveIncome: num('passiveIncome'),
+  productiveRealGrowth: num('productiveRealGrowth') / 100,
+  reinvestPassiveIncome: $('reinvestPassiveIncome').checked,
+  sellProductiveAtRetirement: $('sellProductiveAtRetirement').checked,
+});
 
-/** Monta o objeto de plano esperado por `project` a partir do formulário. */
-function readPlan() {
-  return {
-    currentAge: Math.round(number('currentAge')),
-    retirementAge: Math.round(number('retirementAge')),
-    endAge: Math.round(number('endAge')),
-    initialBalance: number('initialBalance'),
-    monthlyContribution: number('monthlyContribution'),
-    accumulationReturn: rate('accumulationReturn'),
-    retirementReturn: rate('retirementReturn'),
-    inflation: rate('inflation'),
-    indexContribution: form.elements.indexContribution.checked,
-    desiredMonthlyIncome: number('desiredMonthlyIncome'),
-    otherMonthlyIncome: number('otherMonthlyIncome'),
-    legacy: number('legacy'),
-    productiveAssets: number('productiveAssets'),
-    passiveIncome: number('passiveIncome'),
-    productiveRealGrowth: rate('productiveRealGrowth'),
-    reinvestPassiveIncome: form.elements.reinvestPassiveIncome.checked,
-    sellProductiveAtRetirement: form.elements.sellProductiveAtRetirement.checked,
-  };
+/** Conveniência por leitor: guarda o que foi digitado neste navegador. */
+function save() {
+  try {
+    const state = Object.fromEntries(FIELDS.map((id) => [id, $(id).value]));
+    for (const id of SWITCHES) state[id] = $(id).checked;
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  } catch { /* modo privado ou armazenamento bloqueado: seguir sem salvar */ }
 }
 
-/* ---------- Gráfico ---------- */
-
-const VIEW = { width: 860, height: 320 };
-const PAD = { top: 16, right: 18, bottom: 34, left: 88 };
-const PLOT = {
-  width: VIEW.width - PAD.left - PAD.right,
-  height: VIEW.height - PAD.top - PAD.bottom,
-};
-
-/** Cria um elemento SVG com atributos e, opcionalmente, conteúdo textual. */
-function svgEl(name, attributes = {}, textContent) {
-  const node = document.createElementNS(SVG_NS, name);
-  for (const [key, value] of Object.entries(attributes)) {
-    node.setAttribute(key, String(value));
-  }
-  if (textContent !== undefined) node.textContent = textContent;
-  return node;
+function restore() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return;
+    const state = JSON.parse(raw);
+    for (const id of FIELDS) if (typeof state[id] === 'string') $(id).value = state[id];
+    for (const id of SWITCHES) if (typeof state[id] === 'boolean') $(id).checked = state[id];
+  } catch { /* estado inválido: manter os valores padrão */ }
 }
 
-/**
- * Arredonda um valor para cima até um número "redondo" (1, 2, 2,5 ou 5 vezes
- * uma potência de dez), para que o eixo vertical tenha marcações legíveis.
- */
-function niceCeil(value) {
-  if (!(value > 0)) return 1;
-  const magnitude = Math.pow(10, Math.floor(Math.log10(value)));
-  const normalized = value / magnitude;
-  const step = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 2.5 ? 2.5 : normalized <= 5 ? 5 : 10;
-  return step * magnitude;
-}
+/* ---------- Blocos ---------- */
 
-/** Escolhe um intervalo inteiro de anos que gere ~6 marcações no eixo horizontal. */
-function ageStep(totalYears) {
-  for (const candidate of [5, 10, 15, 20, 25]) {
-    if (totalYears / candidate <= 7) return candidate;
-  }
-  return 30;
-}
+function renderVerdict(result, plan) {
+  const verdict = $('verdict');
+  const surplus = result.projectedMonthlyIncome - plan.desiredMonthlyIncome;
 
-/**
- * Reduz a série mensal a pontos anuais, garantindo que o mês da aposentadoria e
- * o último mês estejam presentes mesmo quando não caem numa amostra anual.
- */
-function samplePoints(result, plan) {
-  const lastMonth = result.balanceSeries.length - 1;
-  const months = new Set([result.accumulationMonths, lastMonth]);
-  for (let month = 0; month <= lastMonth; month += 12) months.add(month);
-
-  return [...months]
-    .sort((a, b) => a - b)
-    .map((month) => ({
-      month,
-      age: plan.currentAge + month / 12,
-      value: result.balanceSeries[month],
-      productive: result.productiveSeries[month],
-      // O topo da pilha é o patrimônio total: carteira sobre o bem produtivo.
-      total: result.balanceSeries[month] + result.productiveSeries[month],
-    }));
-}
-
-function renderChart(result, plan) {
-  chart.replaceChildren(chartTitle);
-
-  const points = samplePoints(result, plan);
-  const maxValue = niceCeil(Math.max(...points.map((point) => point.total), 1));
-  const startAge = plan.currentAge;
-  const spanYears = Math.max(plan.endAge - plan.currentAge, 1);
-
-  const x = (age) => PAD.left + ((age - startAge) / spanYears) * PLOT.width;
-  const y = (value) => PAD.top + PLOT.height - (value / maxValue) * PLOT.height;
-  const baseline = PAD.top + PLOT.height;
-
-  const layer = svgEl('g');
-
-  // Linhas de grade e rótulos do eixo vertical.
-  for (let index = 0; index <= 4; index++) {
-    const value = (maxValue / 4) * index;
-    const lineY = y(value);
-    layer.append(
-      svgEl('line', {
-        class: index === 0 ? 'axis-line' : 'grid-line',
-        x1: PAD.left,
-        x2: PAD.left + PLOT.width,
-        y1: lineY,
-        y2: lineY,
-      }),
-      svgEl(
-        'text',
-        { class: 'axis-label', x: PAD.left - 8, y: lineY + 4, 'text-anchor': 'end' },
-        index === 0 ? '0' : currencyCompact.format(value),
-      ),
-    );
+  if (result.neededFromPortfolio === 0) {
+    verdict.dataset.state = 'good';
+    setText('verdict-title', 'Suas rendas fora da carteira já cobrem a meta');
+    setText('verdict-detail',
+      `${money(result.supplementalIncome)} por mês entre INSS, aluguéis e outras fontes já ` +
+      `atendem os ${money(plan.desiredMonthlyIncome)} desejados. Tudo que acumular vira folga.`);
+    return;
   }
 
-  // Rótulos do eixo horizontal, em idades redondas. A idade final é sempre
-  // marcada; se a marcação regular cair perto demais dela, é descartada para não
-  // sobrepor os dois rótulos.
-  const step = ageStep(spanYears);
-  const ticks = [];
-  for (let age = startAge; age < plan.endAge; age += step) ticks.push(age);
-  if (ticks.length > 1 && plan.endAge - ticks[ticks.length - 1] < step * 0.6) ticks.pop();
-  ticks.push(plan.endAge);
-
-  ticks.forEach((age, index) => {
-    const isLast = index === ticks.length - 1;
-    layer.append(
-      svgEl(
-        'text',
-        {
-          class: 'axis-label',
-          x: x(age),
-          y: baseline + 20,
-          'text-anchor': isLast ? 'end' : 'middle',
-        },
-        isLast ? `${Math.round(age)} anos` : String(Math.round(age)),
-      ),
-    );
-  });
-
-  // Áreas e linhas das duas fases. O ponto da aposentadoria entra nas duas para
-  // que as curvas se encontrem sem degrau.
-  const accumulation = points.filter((point) => point.month <= result.accumulationMonths);
-  const retirement = points.filter((point) => point.month >= result.accumulationMonths);
-
-  const topPath = (list) => list.map((point) => `${x(point.age)},${y(point.total)}`).join(' L ');
-
-  // Cada fase é uma faixa entre o topo do patrimônio produtivo e o patrimônio
-  // total, para que a carteira apareça empilhada sobre o bem em vez de escondê-lo.
-  const addPhase = (list, areaClass, lineClass) => {
-    if (list.length < 2) return;
-    const top = topPath(list);
-    const floor = [...list]
-      .reverse()
-      .map((point) => `${x(point.age)},${y(point.productive)}`)
-      .join(' L ');
-    layer.append(
-      svgEl('path', { class: areaClass, d: `M ${top} L ${floor} Z` }),
-      svgEl('path', { class: lineClass, d: `M ${top}` }),
-    );
-  };
-
-  addPhase(accumulation, 'area-accumulation', 'line-accumulation');
-  addPhase(retirement, 'area-retirement', 'line-retirement');
-
-  if (points.some((point) => point.productive > 0)) {
-    const productive = points.map((point) => `${x(point.age)},${y(point.productive)}`).join(' L ');
-    const first = points[0];
-    const last = points[points.length - 1];
-    layer.append(
-      svgEl('path', {
-        class: 'area-productive',
-        d: `M ${x(first.age)},${baseline} L ${productive} L ${x(last.age)},${baseline} Z`,
-      }),
-      svgEl('path', { class: 'line-productive', d: `M ${productive}` }),
-    );
+  if (result.onTrack) {
+    verdict.dataset.state = 'good';
+    setText('verdict-title', 'Seu plano chega lá');
+    setText('verdict-detail',
+      `Mantendo ${money(plan.monthlyContribution)} por mês, aos ${plan.retirementAge} anos você terá ` +
+      `${money(result.balanceAtRetirement)} e uma renda de ${money(result.projectedMonthlyIncome)} por mês — ` +
+      `${money(Math.abs(surplus))} ${surplus >= 0 ? 'acima' : 'abaixo'} da meta, com o dinheiro durando ` +
+      `até os ${plan.endAge} anos.`);
+    return;
   }
 
-  // Marcador da aposentadoria.
-  document.getElementById('key-productive').hidden = !(plan.productiveAssets > 0);
+  verdict.dataset.state = 'short';
+  setText('verdict-title', `Faltam ${moneyUp(result.gap)} de patrimônio`);
 
-  const retirementX = x(plan.retirementAge);
-  layer.append(
-    svgEl('line', { class: 'marker-line', x1: retirementX, x2: retirementX, y1: PAD.top, y2: baseline }),
-    svgEl(
-      'text',
-      {
-        class: 'marker-label',
-        x: retirementX + (retirementX > PAD.left + PLOT.width * 0.75 ? -6 : 6),
-        y: PAD.top + 11,
-        'text-anchor': retirementX > PAD.left + PLOT.width * 0.75 ? 'end' : 'start',
-      },
-      `Aposentadoria aos ${plan.retirementAge}`,
-    ),
-  );
+  const fix = Number.isFinite(result.requiredMonthlyContribution)
+    ? `Aportar ${moneyUp(result.requiredMonthlyContribution)} por mês ` +
+      `(${moneyUp(result.additionalMonthlyContribution)} a mais) fecha a conta.`
+    : 'Com retorno real nulo ou negativo, aumentar o aporte não resolve sozinho: reveja as premissas.';
 
-  chart.append(layer);
-  attachHover(chart, points, { x, y, baseline, plan });
+  const ends = result.depletionAge === null ? ''
+    : ` Mantendo a retirada desejada, o dinheiro acabaria aos ${Math.floor(result.depletionAge)} anos.`;
+
+  setText('verdict-detail',
+    `Sua renda projetada é ${money(result.projectedMonthlyIncome)} por mês, contra ` +
+    `${money(plan.desiredMonthlyIncome)} desejados. ${fix}${ends}`);
 }
 
-/**
- * Liga a leitura do gráfico ao ponteiro: destaca o ponto anual mais próximo e
- * mostra idade e saldo. A tabela ano a ano cobre o mesmo conteúdo para quem não
- * usa ponteiro.
- */
-function attachHover(svg, points, { x, y, baseline }) {
-  const hover = svgEl('g', { style: 'display:none; pointer-events:none' });
-  const line = svgEl('line', { class: 'hover-line', y1: PAD.top, y2: baseline });
-  const dot = svgEl('circle', { class: 'hover-dot', r: 4.5 });
-  const box = svgEl('rect', { class: 'hover-box', rx: 6, width: 160, height: 44 });
-  const ageText = svgEl('text', { class: 'hover-text-label' });
-  const valueText = svgEl('text', { class: 'hover-text' });
-  hover.append(line, box, ageText, valueText, dot);
+function renderMetrics(result, plan, earliest) {
+  $('m-income').dataset.tone = result.onTrack ? 'good' : 'short';
+  setNumber('v-income', result.projectedMonthlyIncome);
 
-  const surface = svgEl('rect', {
-    x: PAD.left,
-    y: PAD.top,
-    width: PLOT.width,
-    height: PLOT.height,
-    fill: 'transparent',
-  });
+  const sources = [`carteira ${money(result.sustainableIncome)}`];
+  if (plan.otherMonthlyIncome > 0) sources.push(`INSS ${money(plan.otherMonthlyIncome)}`);
+  if (result.passiveDuringRetirement > 0) sources.push(`passiva ${money(result.passiveDuringRetirement)}`);
+  setText('n-income', `Meta ${money(plan.desiredMonthlyIncome)} · ${sources.join(' + ')}`);
 
-  const move = (event) => {
-    const bounds = svg.getBoundingClientRect();
-    if (bounds.width === 0) return;
-    const viewX = ((event.clientX - bounds.left) / bounds.width) * VIEW.width;
+  setNumber('v-balance', result.balanceAtRetirement);
+  setText('n-balance', result.productiveAtEnd > 0
+    ? `Em ${anos(plan.retirementAge - plan.currentAge)} · mais ${money(result.productiveAtRetirement)} em bens`
+    : `Em ${anos(plan.retirementAge - plan.currentAge)}, em valores de hoje`);
 
-    let nearest = points[0];
-    for (const point of points) {
-      if (Math.abs(x(point.age) - viewX) < Math.abs(x(nearest.age) - viewX)) nearest = point;
-    }
+  setNumber('v-target', result.targetBalance, moneyUp);
+  setText('n-target', result.onTrack
+    ? `Sobra de ${money(-result.gap)}`
+    : `Faltam ${moneyUp(result.gap)}`);
 
-    const pointX = x(nearest.age);
-    const pointY = y(nearest.total);
-    const isAccumulation = nearest.month <= 0 || pointY <= baseline;
-
-    line.setAttribute('x1', pointX);
-    line.setAttribute('x2', pointX);
-    dot.setAttribute('cx', pointX);
-    dot.setAttribute('cy', pointY);
-    dot.setAttribute('stroke', 'currentColor');
-    dot.style.color = isAccumulation ? 'var(--accent)' : 'var(--growth)';
-
-    // Mantém a caixa dentro da área do gráfico.
-    const boxX = Math.min(Math.max(pointX - 80, PAD.left), PAD.left + PLOT.width - 160);
-    const boxY = Math.max(pointY - 56, PAD.top);
-    box.setAttribute('x', boxX);
-    box.setAttribute('y', boxY);
-    ageText.setAttribute('x', boxX + 12);
-    ageText.setAttribute('y', boxY + 17);
-    valueText.setAttribute('x', boxX + 12);
-    valueText.setAttribute('y', boxY + 34);
-    ageText.textContent = `${Math.round(nearest.age)} anos`;
-    valueText.textContent = currency.format(nearest.total);
-
-    hover.style.display = '';
-  };
-
-  surface.addEventListener('pointermove', move);
-  surface.addEventListener('pointerdown', move);
-  surface.addEventListener('pointerleave', () => {
-    hover.style.display = 'none';
-  });
-
-  svg.append(surface, hover);
+  // Parar antes do planejado é boa notícia; ter de adiar, não.
+  const earliestCard = $('m-earliest');
+  if (earliest === null) {
+    earliestCard.dataset.tone = 'short';
+    $('v-earliest').textContent = '—';
+    $('v-earliest')._value = null;
+    setText('n-earliest', 'A meta não é atingida em nenhuma idade com o aporte atual');
+    return;
+  }
+  earliestCard.dataset.tone = earliest <= plan.retirementAge ? 'good' : 'short';
+  setNumber('v-earliest', earliest, (value) => `${Math.round(value)} anos`);
+  setText('n-earliest', earliest < plan.retirementAge
+    ? `${anos(plan.retirementAge - earliest)} antes do que você planejou`
+    : earliest === plan.retirementAge
+      ? 'Exatamente a idade que você planejou'
+      : `${anos(earliest - plan.retirementAge)} depois do que você planejou`);
 }
 
-/* ---------- Composição do patrimônio ---------- */
-
-function renderBreakdown(result, plan) {
+function renderWealthComposition(result, plan) {
   const initial = Math.max(0, plan.initialBalance);
-  const contributed = Math.max(0, result.totalContributed);
+  const paid = Math.max(0, result.totalContributed);
   const passive = Math.max(0, result.totalPassiveReinvested);
   const growth = Math.max(0, result.investmentGrowth);
-  const total = initial + contributed + passive + growth || 1;
+  const total = initial + paid + passive + growth || 1;
 
   const share = (value) => `${(value / total) * 100}%`;
-  document.getElementById('seg-initial').style.flexBasis = share(initial);
-  document.getElementById('seg-contributed').style.flexBasis = share(contributed);
-  document.getElementById('seg-passive').style.flexBasis = share(passive);
-  document.getElementById('seg-growth').style.flexBasis = share(growth);
+  $('s-initial').style.flexBasis = share(initial);
+  $('s-paid').style.flexBasis = share(paid);
+  $('s-passive').style.flexBasis = share(passive);
+  $('s-growth').style.flexBasis = share(growth);
 
-  text('value-initial', money(initial));
-  text('value-contributed', money(contributed));
-  text('value-passive', money(passive));
-  text('value-growth', money(result.investmentGrowth));
-
-  document.getElementById('part-passive').hidden = passive <= 0;
+  setNumber('v-initial', initial);
+  setNumber('v-paid', paid);
+  setNumber('v-passive', passive);
+  setNumber('v-growth', result.investmentGrowth);
+  $('part-passive').hidden = passive <= 0;
 }
 
-/* ---------- Premissas ---------- */
+function renderRate(result) {
+  const rate = withdrawalRate(result);
+  if (rate === null) {
+    setText('v-rate', '—');
+    $('rate-needle').style.left = '0%';
+    setText('rate-caption', 'Sem patrimônio acumulado não há retirada a medir.');
+    return;
+  }
+
+  setNumber('v-rate', rate.rate, pct);
+  // A escala vai de 0% a 8%; acima disso o ponteiro encosta na ponta.
+  $('rate-needle').style.left = `${Math.min(rate.rate / 0.08, 1) * 100}%`;
+
+  const compare = rate.ratio > 1.15
+    ? `Acima da referência de 4% — o plano depende de o mercado colaborar, ou de a aposentadoria ser mais curta.`
+    : rate.ratio < 0.85
+      ? `Abaixo da referência de 4% — há folga para gastar mais ou deixar mais herança.`
+      : `Em linha com a referência de 4% usada para aposentadorias de cerca de 30 anos.`;
+  setText('rate-caption', `Você retiraria ${pct(rate.rate)} do patrimônio no primeiro ano. ${compare}`);
+}
+
+function renderTable(result, plan) {
+  const lastMonth = result.balanceSeries.length - 1;
+  const rows = [];
+
+  // A coluna do bem só aparece quando há um: uma coluna de zeros é ruído.
+  const showProductive = result.productiveSeries.some((value) => value > 0);
+  $('th-productive').hidden = !showProductive;
+
+  for (let start = 0; start < lastMonth; start += 12) {
+    const end = Math.min(start + 12, lastMonth);
+    let flow = 0;
+    for (let month = start + 1; month <= end; month++) flow += result.flowSeries[month];
+
+    const closing = result.balanceSeries[end];
+    const growth = closing - result.balanceSeries[start] - flow;
+    const retired = start >= result.accumulationMonths;
+
+    const row = document.createElement('tr');
+    row.dataset.phase = retired ? 'retirement' : 'accumulation';
+
+    const cells = [
+      [String(plan.currentAge + end / 12), false],
+      [retired ? 'Aposentadoria' : 'Acumulação', false],
+      [money(flow), flow < 0],
+      [money(growth), growth < 0],
+      [money(closing), false],
+    ];
+    if (showProductive) cells.push([money(result.productiveSeries[end]), false]);
+
+    for (const [value, debit] of cells) {
+      const cell = document.createElement('td');
+      cell.textContent = value;
+      if (debit) cell.classList.add('debit');
+      row.append(cell);
+    }
+    rows.push(row);
+  }
+  $('rows').replaceChildren(...rows);
+}
 
 function renderAssumptions(result, plan) {
   const rows = [
-    ['Tempo até a aposentadoria', years(plan.retirementAge - plan.currentAge)],
-    ['Duração da aposentadoria', years(plan.endAge - plan.retirementAge)],
-    ['Retorno real na acumulação', percent.format(result.realAccumulationReturn)],
-    ['Retorno real na aposentadoria', percent.format(result.realRetirementReturn)],
-    ['Inflação considerada', percent.format(plan.inflation)],
+    ['Tempo até a aposentadoria', anos(plan.retirementAge - plan.currentAge)],
+    ['Duração da aposentadoria', anos(plan.endAge - plan.retirementAge)],
+    ['Retorno real na acumulação', pct(result.realAccumulationReturn)],
+    ['Retorno real na aposentadoria', pct(result.realRetirementReturn)],
+    ['Inflação considerada', pct(plan.inflation)],
     ['Aporte corrigido pela inflação', plan.indexContribution ? 'Sim' : 'Não'],
     ['Herança planejada', money(plan.legacy)],
     ['Saldo da carteira ao fim', money(result.legacyAtEnd)],
@@ -385,201 +310,94 @@ function renderAssumptions(result, plan) {
     );
   }
 
-  const list = document.getElementById('assumptions');
-  list.replaceChildren(
-    ...rows.map(([label, value]) => {
-      const wrapper = document.createElement('div');
-      const term = document.createElement('dt');
-      const definition = document.createElement('dd');
-      term.textContent = label;
-      definition.textContent = value;
-      wrapper.append(term, definition);
-      return wrapper;
-    }),
-  );
-}
-
-/* ---------- Tabela ano a ano ---------- */
-
-function renderTable(result, plan) {
-  const lastMonth = result.balanceSeries.length - 1;
-  const body = document.getElementById('table-body');
-  const rows = [];
-
-  // A coluna do bem produtivo só aparece quando há um: uma coluna de zeros é ruído.
-  const showProductive = result.productiveSeries.some((value) => value > 0);
-  document.getElementById('th-productive').hidden = !showProductive;
-
-  for (let start = 0; start < lastMonth; start += 12) {
-    const end = Math.min(start + 12, lastMonth);
-
-    let flow = 0;
-    for (let month = start + 1; month <= end; month++) flow += result.flowSeries[month];
-
-    const opening = result.balanceSeries[start];
-    const closing = result.balanceSeries[end];
-    const growth = closing - opening - flow;
-    const isRetirement = start >= result.accumulationMonths;
-
-    const row = document.createElement('tr');
-    row.dataset.phase = isRetirement ? 'retirement' : 'accumulation';
-
-    const cells = [
-      [String(plan.currentAge + end / 12), false],
-      [isRetirement ? 'Aposentadoria' : 'Acumulação', false],
-      [money(flow), flow < 0],
-      [money(growth), growth < 0],
-      [money(closing), false],
-    ];
-
-    if (showProductive) cells.push([money(result.productiveSeries[end]), false]);
-
-    for (const [value, negative] of cells) {
-      const cell = document.createElement('td');
-      cell.textContent = value;
-      if (negative) cell.classList.add('negative');
-      row.append(cell);
-    }
-
-    rows.push(row);
-  }
-
-  body.replaceChildren(...rows);
-}
-
-/* ---------- Veredito e cartões ---------- */
-
-function renderVerdict(result, plan) {
-  const verdict = document.getElementById('verdict');
-  const surplus = result.projectedMonthlyIncome - result.desiredMonthlyIncome;
-
-  if (result.neededFromPortfolio === 0) {
-    verdict.dataset.status = 'good';
-    text('verdict-title', 'Suas rendas fora da carteira já cobrem a meta');
-    text(
-      'verdict-detail',
-      `${money(result.supplementalIncome)} por mês entre INSS, aluguéis e outras fontes já ` +
-        `atendem os ${money(plan.desiredMonthlyIncome)} desejados. Tudo que você acumular vira folga.`,
-    );
-    return;
-  }
-
-  if (result.onTrack) {
-    verdict.dataset.status = 'good';
-    text('verdict-title', 'Seu plano chega lá');
-    text(
-      'verdict-detail',
-      `Mantendo ${money(plan.monthlyContribution)} por mês, aos ${plan.retirementAge} anos você ` +
-        `terá ${money(result.balanceAtRetirement)} e uma renda de ` +
-        `${money(result.projectedMonthlyIncome)} por mês — ${money(Math.abs(surplus))} ` +
-        `${surplus >= 0 ? 'acima' : 'abaixo'} da meta, com o dinheiro durando até os ${plan.endAge} anos.`,
-    );
-    return;
-  }
-
-  verdict.dataset.status = 'short';
-  text('verdict-title', `Faltam ${moneyUp(result.gap)} de patrimônio`);
-
-  const depletion =
-    result.depletionAge === null
-      ? ''
-      : ` Mantendo a retirada desejada, o dinheiro acabaria aos ${Math.floor(result.depletionAge)} anos.`;
-
-  const fix = Number.isFinite(result.requiredMonthlyContribution)
-    ? `Aportar ${moneyUp(result.requiredMonthlyContribution)} por mês ` +
-      `(${moneyUp(result.additionalMonthlyContribution)} a mais) fecha a conta.`
-    : 'Com um retorno real nulo ou negativo, só aumentar o aporte não resolve: reveja as premissas.';
-
-  text(
-    'verdict-detail',
-    `Sua renda projetada é ${money(result.projectedMonthlyIncome)} por mês, contra ` +
-      `${money(plan.desiredMonthlyIncome)} desejados. ${fix}${depletion}`,
-  );
-}
-
-function renderCards(result, plan) {
-  const incomeCard = document.getElementById('card-income');
-  incomeCard.dataset.tone = result.onTrack ? 'good' : 'short';
-  text('value-income', money(result.projectedMonthlyIncome));
-  const sources = [`carteira ${money(result.sustainableIncome)}`];
-  if (plan.otherMonthlyIncome > 0) sources.push(`INSS e outras ${money(plan.otherMonthlyIncome)}`);
-  if (result.passiveDuringRetirement > 0) {
-    sources.push(`renda passiva ${money(result.passiveDuringRetirement)}`);
-  }
-  text('note-income', `Meta: ${money(plan.desiredMonthlyIncome)} · ${sources.join(' + ')}`);
-
-  text('value-balance', money(result.balanceAtRetirement));
-  text(
-    'note-balance',
-    result.productiveAtEnd > 0
-      ? `Em ${years(plan.retirementAge - plan.currentAge)} · mais ` +
-        `${money(result.productiveAtRetirement)} em patrimônio produtivo mantido`
-      : `Em ${years(plan.retirementAge - plan.currentAge)}, em valores de hoje`,
-  );
-
-  text('value-target', moneyUp(result.targetBalance));
-  text(
-    'note-target',
-    result.onTrack
-      ? `Sobra de ${money(-result.gap)}`
-      : `Faltam ${moneyUp(result.gap)}`,
-  );
-
-  const contributionCard = document.getElementById('card-contribution');
-  contributionCard.dataset.tone = result.onTrack ? 'good' : 'short';
-  text('value-contribution', moneyUp(result.requiredMonthlyContribution));
-  text(
-    'note-contribution',
-    result.onTrack
-      ? `Você já aporta ${money(plan.monthlyContribution)}`
-      : `${moneyUp(result.additionalMonthlyContribution)} a mais do que hoje`,
-  );
+  $('assumptions').replaceChildren(...rows.map(([label, value]) => {
+    const wrapper = document.createElement('div');
+    const term = document.createElement('dt');
+    const definition = document.createElement('dd');
+    term.textContent = label;
+    definition.textContent = value;
+    wrapper.append(term, definition);
+    return wrapper;
+  }));
 }
 
 /* ---------- Orquestração ---------- */
+
+let firstRender = true;
 
 function render() {
   const plan = readPlan();
   const errors = validate(plan);
 
   if (errors.length > 0) {
-    errorList.replaceChildren(
-      ...errors.map((message) => {
-        const item = document.createElement('li');
-        item.textContent = message;
-        return item;
-      }),
-    );
-    errorBox.hidden = false;
-    results.style.opacity = '0.4';
+    $('error-list').replaceChildren(...errors.map((message) => {
+      const item = document.createElement('li');
+      item.textContent = message;
+      return item;
+    }));
+    $('errors').hidden = false;
+    $('results').style.opacity = '0.45';
     return;
   }
 
-  errorBox.hidden = true;
-  results.style.opacity = '1';
+  $('errors').hidden = true;
+  $('results').style.opacity = '1';
 
   const result = project(plan);
+  const earliest = earliestFeasibleRetirementAge(plan);
 
   renderVerdict(result, plan);
-  renderCards(result, plan);
-  renderChart(result, plan);
-  renderBreakdown(result, plan);
-  renderAssumptions(result, plan);
+  renderMetrics(result, plan, earliest);
+  renderWealthComposition(result, plan);
+  renderRate(result);
   renderTable(result, plan);
+  renderAssumptions(result, plan);
 
-  text(
-    'chart-note',
-    result.depletionAge === null
-      ? `O patrimônio sustenta ${money(result.sustainableIncome)} por mês até os ${plan.endAge} anos.`
-      : `Retirando os ${money(result.neededFromPortfolio)} mensais desejados da carteira, o saldo ` +
-        `zeraria aos ${Math.floor(result.depletionAge)} anos.`,
-  );
+  const { hasProductive } = drawWealthChart($('chart'), result, plan, {
+    animate: firstRender,
+    title: $('chart-desc'),
+  });
+  $('key-productive').hidden = !hasProductive;
+
+  setText('chart-caption', result.depletionAge === null
+    ? `O patrimônio sustenta ${money(result.sustainableIncome)} por mês até os ${plan.endAge} anos.`
+    : `Retirando os ${money(result.neededFromPortfolio)} mensais desejados da carteira, o saldo ` +
+      `zeraria aos ${Math.floor(result.depletionAge)} anos.`);
+
+  drawIncomeMix($('mix'), $('mix-list'), incomeSources(result, plan));
+
+  const levers = sensitivity(plan);
+  drawSensitivity($('levers'), levers);
+  const strongest = levers.levers[0];
+  setText('levers-caption', strongest
+    ? `A alavanca mais forte é "${strongest.label.toLowerCase()}": sozinha, move ` +
+      `${money(Math.abs(strongest.delta))} por mês.`
+    : '');
+
+  const crashes = crashScenarios(plan);
+  drawCrashScenarios($('crashes'), crashes, plan.desiredMonthlyIncome);
+  const survived = crashes.filter((scenario) => scenario.coverage >= 1).length;
+  setText('crashes-caption', survived === crashes.length
+    ? 'O plano continua atendendo a meta mesmo com uma queda de 30% logo na largada.'
+    : survived === 0
+      ? 'Qualquer uma dessas quedas já derrubaria a renda abaixo da meta.'
+      : `A meta resiste até uma queda de ${Math.round(crashes[survived - 1].drop * 100)}%; ` +
+        `além disso, a renda fica abaixo do desejado.`);
+
+  firstRender = false;
 }
 
-form.addEventListener('input', render);
-// O formulário só volta aos valores padrão depois do evento `reset`.
-form.addEventListener('reset', () => window.setTimeout(render, 0));
-// O gráfico usa medidas em pixels do ponteiro; redesenhar mantém o hover correto.
+$('form').addEventListener('input', () => { render(); save(); });
+
+$('reset').addEventListener('click', () => {
+  for (const id of FIELDS) $(id).value = DEFAULTS[id];
+  for (const id of SWITCHES) $(id).checked = SWITCH_DEFAULTS[id];
+  render();
+  save();
+});
+
+// O gráfico mapeia pixels do ponteiro; redesenhar mantém a leitura correta.
 window.addEventListener('resize', render);
 
+restore();
 render();

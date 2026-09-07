@@ -1,231 +1,348 @@
-/* Calculadora de aposentadoria — folha de estilo única, sem dependências. */
+/* ============================================================
+   Calculadora de aposentadoria — folha de estilo única.
+
+   As cores de série vêm da paleta categórica validada (azul, aqua, laranja):
+   é o único trio que passa em todos os pares nos checks de separação para
+   daltonismo e para visão normal, no tema claro e no escuro. As cores de estado
+   (bom / atenção / ruim) são reservadas e nunca aparecem como série de gráfico.
+   ============================================================ */
 
 :root {
-  color-scheme: light dark;
-
-  --bg: #f4f6fb;
+  --ground: #eef1f6;
   --surface: #ffffff;
-  --surface-alt: #f8fafc;
-  --border: #dfe4ee;
-  --border-strong: #c3cbdb;
-  --text: #16202f;
-  --text-muted: #5c6a80;
+  --surface-2: #f6f8fc;
+  --line: #dce2ed;
+  --line-strong: #bfc9da;
+  --ink: #12263f;
+  --ink-muted: #5a6b84;
 
-  --accent: #2f5bea;
-  --accent-soft: #e6ecfe;
-  --growth: #0f9d75;
-  --growth-soft: #dcf3ec;
-  --warn: #b4530a;
-  --warn-soft: #fdeedd;
-  --danger: #c0342b;
-  --productive: #8a6d3b;
+  /* Séries (entidades) */
+  --series-portfolio: #2a78d6;
+  --series-other: #1baf7a;
+  --series-productive: #eb6834;
 
-  --radius: 12px;
-  --radius-sm: 8px;
-  --shadow: 0 1px 2px rgb(16 32 47 / 6%), 0 8px 24px rgb(16 32 47 / 6%);
+  /* Estados — reservados, nunca usados como série */
+  --good: #147a4a;
+  --good-soft: #dff1e7;
+  --short: #b45309;
+  --short-soft: #fbeddb;
+  --bad: #e34948;
 
-  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-num: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --shadow: 0 1px 2px rgb(18 38 63 / 7%), 0 10px 26px rgb(18 38 63 / 6%);
+
+  --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --radius: 10px;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0e131c;
-    --surface: #161d29;
-    --surface-alt: #1c2534;
-    --border: #29344a;
-    --border-strong: #3a4761;
-    --text: #e8edf6;
-    --text-muted: #9aa8bf;
+  :root:not([data-theme="light"]) {
+    --ground: #0c1420;
+    --surface: #141e2e;
+    --surface-2: #1a2537;
+    --line: #263248;
+    --line-strong: #3a4860;
+    --ink: #e6edf7;
+    --ink-muted: #94a5be;
 
-    --accent: #7d9bff;
-    --accent-soft: #1e2a4d;
-    --growth: #3fd7a8;
-    --growth-soft: #143329;
-    --warn: #f0a55c;
-    --warn-soft: #35250f;
-    --danger: #ff8578;
-    --productive: #c9a227;
+    --series-portfolio: #3987e5;
+    --series-other: #199e70;
+    --series-productive: #d95926;
 
-    --shadow: 0 1px 2px rgb(0 0 0 / 35%), 0 8px 24px rgb(0 0 0 / 30%);
+    --good: #35c79a;
+    --good-soft: #10322a;
+    --short: #e8a44e;
+    --short-soft: #33240f;
+    --bad: #e66767;
+
+    --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 10px 26px rgb(0 0 0 / 32%);
   }
 }
 
-* {
+:root[data-theme="dark"] {
+  --ground: #0c1420;
+  --surface: #141e2e;
+  --surface-2: #1a2537;
+  --line: #263248;
+  --line-strong: #3a4860;
+  --ink: #e6edf7;
+  --ink-muted: #94a5be;
+
+  --series-portfolio: #3987e5;
+  --series-other: #199e70;
+  --series-productive: #d95926;
+
+  --good: #35c79a;
+  --good-soft: #10322a;
+  --short: #e8a44e;
+  --short-soft: #33240f;
+  --bad: #e66767;
+
+  --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 10px 26px rgb(0 0 0 / 32%);
+}
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
+}
+
+/* O `display: none` que o navegador dá a `[hidden]` vem da folha de usuário e
+   perde para qualquer regra de autor — inclusive um `.parts > div { display:
+   flex }`. Sem isto, blocos ocultos continuam visíveis. */
+[hidden] {
+  display: none !important;
 }
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font);
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
   font-size: 15px;
-  line-height: 1.5;
-  -webkit-text-size-adjust: 100%;
+  line-height: 1.55;
+}
+
+/* Toda a motion do documento passa por aqui. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 .page {
-  max-width: 1180px;
+  max-width: 1220px;
   margin: 0 auto;
-  padding: 32px 20px 64px;
+  padding: 36px 22px 56px;
 }
 
 /* ---------- Cabeçalho ---------- */
 
-.page-header {
-  margin-bottom: 28px;
+.masthead {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 22px;
+  margin-bottom: 26px;
+  border-bottom: 1px solid var(--line);
 }
 
-.page-header h1 {
-  margin: 0 0 6px;
-  font-size: 1.75rem;
-  letter-spacing: -0.02em;
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
 }
 
-.page-header p {
+h1 {
   margin: 0;
-  max-width: 62ch;
-  color: var(--text-muted);
+  font-family: var(--serif);
+  font-size: clamp(1.9rem, 4vw, 2.6rem);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+  text-wrap: balance;
 }
 
-/* ---------- Layout ---------- */
+.standfirst {
+  margin: 0;
+  max-width: 64ch;
+  color: var(--ink-muted);
+}
+
+.standfirst strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* ---------- Grade ---------- */
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(300px, 350px) minmax(0, 1fr);
+  grid-template-columns: minmax(290px, 340px) minmax(0, 1fr);
   gap: 24px;
   align-items: start;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 980px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
-.panel {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-}
-
-.form-panel {
-  padding: 20px;
-  position: sticky;
-  top: 20px;
-}
-
-@media (max-width: 900px) {
-  .form-panel {
-    position: static;
-  }
-}
-
 .results {
   display: grid;
-  gap: 20px;
+  gap: 18px;
   min-width: 0;
 }
 
-/* Itens de grade têm `min-width: auto` e se recusam a encolher abaixo do próprio
-   conteúdo. Sem isto, a tabela larga empurra a página inteira em vez de rolar
-   dentro do seu container. */
+/* Itens de grade têm `min-width: auto` e não encolhem abaixo do próprio
+   conteúdo. Sem isto, uma tabela larga empurra a página em vez de rolar. */
 .results > * {
   min-width: 0;
 }
 
-/* ---------- Formulário ---------- */
+.pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 18px;
+  min-width: 0;
+}
+
+.pair > * {
+  min-width: 0;
+}
+
+/* ---------- Entrada da página ---------- */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.results > * {
+  animation: rise 0.45s ease-out both;
+}
+
+.results > *:nth-child(1) { animation-delay: 0.02s; }
+.results > *:nth-child(2) { animation-delay: 0.06s; }
+.results > *:nth-child(3) { animation-delay: 0.1s; }
+.results > *:nth-child(4) { animation-delay: 0.14s; }
+.results > *:nth-child(5) { animation-delay: 0.18s; }
+.results > *:nth-child(n + 6) { animation-delay: 0.22s; }
+
+/* ---------- Painel de controles ---------- */
+
+.controls {
+  padding: 20px;
+  position: sticky;
+  top: 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+@media (max-width: 980px) {
+  .controls {
+    position: static;
+  }
+}
 
 fieldset {
   border: 0;
   padding: 0;
-  margin: 0 0 22px;
+  margin: 0;
+  display: grid;
+  gap: 13px;
 }
 
-fieldset:last-of-type {
-  margin-bottom: 0;
+fieldset + fieldset {
+  margin-top: 24px;
+}
+
+/* O navegador posiciona `legend` sobre a borda do `fieldset`, o que deixaria um
+   traço solto ao lado do rótulo. A régua vai no próprio box da legenda. */
+fieldset + fieldset > legend {
+  width: 100%;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
 }
 
 legend {
   padding: 0;
-  margin-bottom: 12px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--ink-muted);
+}
+
+/* `legend` não participa do gap da grade; o espaço vem daqui. */
+fieldset > legend {
+  margin-bottom: 11px;
 }
 
 .field {
-  margin-bottom: 14px;
+  display: grid;
+  gap: 5px;
 }
 
-.field label {
-  display: block;
-  margin-bottom: 5px;
+.field > label {
   font-size: 0.875rem;
   font-weight: 500;
 }
 
-.field .hint {
-  display: block;
-  margin-top: 4px;
+.hint {
   font-size: 0.75rem;
-  color: var(--text-muted);
+  line-height: 1.45;
+  color: var(--ink-muted);
 }
 
-.input-wrap {
+.control {
   display: flex;
   align-items: stretch;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--surface-alt);
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--surface-2);
   overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.input-wrap:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+.control:focus-within {
+  border-color: var(--series-portfolio);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--series-portfolio) 20%, transparent);
 }
 
-.input-wrap .affix {
+.control .affix {
   display: flex;
   align-items: center;
-  padding: 0 10px;
-  font-size: 0.8125rem;
-  color: var(--text-muted);
-  background: transparent;
+  padding: 0 9px;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
   white-space: nowrap;
 }
 
-.input-wrap .affix:first-child {
-  border-right: 1px solid var(--border);
+.control .affix:first-child {
+  border-right: 1px solid var(--line);
 }
 
-.input-wrap .affix:last-child {
-  border-left: 1px solid var(--border);
+.control .affix:last-child {
+  border-left: 1px solid var(--line);
 }
 
-input[type="number"] {
+.control input {
   flex: 1;
   min-width: 0;
   border: 0;
   background: transparent;
   color: inherit;
-  font: inherit;
-  font-family: var(--font-num);
+  font-family: var(--mono);
+  font-size: 0.9375rem;
   font-variant-numeric: tabular-nums;
-  padding: 9px 10px;
+  padding: 8px 10px;
   text-align: right;
 }
 
-input[type="number"]:focus {
+.control input:focus {
   outline: none;
 }
 
-.checkbox {
+.switch {
   display: flex;
   gap: 9px;
   align-items: flex-start;
@@ -233,48 +350,50 @@ input[type="number"]:focus {
   cursor: pointer;
 }
 
-.checkbox input {
+.switch input {
   margin: 3px 0 0;
-  accent-color: var(--accent);
+  accent-color: var(--series-portfolio);
   flex-shrink: 0;
 }
 
-.form-actions {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
-
 button {
-  font: inherit;
+  font-family: var(--sans);
+  font-size: 0.875rem;
   font-weight: 500;
-  color: var(--text-muted);
-  background: var(--surface-alt);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
+  color: var(--ink-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
   padding: 8px 14px;
   cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
 
 button:hover {
-  color: var(--text);
-  border-color: var(--accent);
+  color: var(--ink);
+  border-color: var(--series-portfolio);
 }
 
-button:focus-visible {
-  outline: 2px solid var(--accent);
+:focus-visible {
+  outline: 2px solid var(--series-portfolio);
   outline-offset: 2px;
 }
 
-/* ---------- Erros de validação ---------- */
+.actions {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+/* ---------- Erros ---------- */
 
 .errors {
-  margin: 0 0 18px;
-  padding: 12px 14px;
-  border: 1px solid var(--danger);
-  border-radius: var(--radius-sm);
-  background: var(--warn-soft);
-  color: var(--danger);
+  padding: 12px 15px;
+  margin-bottom: 16px;
+  border: 1px solid var(--bad);
+  border-radius: 7px;
+  background: var(--short-soft);
+  color: var(--bad);
   font-size: 0.875rem;
 }
 
@@ -290,134 +409,143 @@ button:focus-visible {
 /* ---------- Veredito ---------- */
 
 .verdict {
-  padding: 18px 20px;
-  border-left: 4px solid var(--growth);
-  background: var(--growth-soft);
+  display: grid;
+  gap: 4px;
+  padding: 17px 20px;
+  border-radius: var(--radius);
+  border-left: 3px solid var(--good);
+  background: var(--good-soft);
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
-.verdict[data-status="short"] {
-  border-left-color: var(--warn);
-  background: var(--warn-soft);
+.verdict[data-state="short"] {
+  border-left-color: var(--short);
+  background: var(--short-soft);
 }
 
 .verdict h2 {
-  margin: 0 0 4px;
-  font-size: 1.0625rem;
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 1.1875rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .verdict p {
   margin: 0;
   font-size: 0.9375rem;
-  color: var(--text);
 }
 
-/* ---------- Cartões de resultado ---------- */
+/* ---------- Métricas ---------- */
 
-.cards {
+.metrics {
   display: grid;
-  /* Duas colunas dão largura suficiente para valores de sete ou oito dígitos —
-     o `Intl` separa "R$" do número com espaço inseparável, então o valor nunca
-     quebra em duas linhas e precisa caber inteiro. */
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
 
 @media (max-width: 560px) {
-  .cards {
+  .metrics {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
-.card {
-  padding: 16px 18px;
+.metric {
+  display: grid;
+  gap: 5px;
+  align-content: start;
+  padding: 15px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
 }
 
-.card .card-label {
-  display: block;
-  font-size: 0.75rem;
+.metric-label {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
   font-weight: 600;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--ink-muted);
 }
 
-.card .card-value {
-  display: block;
-  margin-top: 6px;
-  font-family: var(--font-num);
+.metric-value {
+  font-family: var(--mono);
   font-variant-numeric: tabular-nums;
   font-size: 1.5rem;
   font-weight: 600;
   letter-spacing: -0.02em;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 
-.card .card-note {
-  display: block;
-  margin-top: 5px;
+.metric[data-tone="good"] .metric-value { color: var(--good); }
+.metric[data-tone="short"] .metric-value { color: var(--short); }
+
+.metric-note {
   font-size: 0.8125rem;
-  color: var(--text-muted);
+  color: var(--ink-muted);
 }
 
-.card[data-tone="good"] .card-value {
-  color: var(--growth);
-}
+/* ---------- Blocos ---------- */
 
-.card[data-tone="short"] .card-value {
-  color: var(--warn);
-}
-
-/* ---------- Gráfico ---------- */
-
-.chart-panel {
+.block {
   padding: 18px 20px 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
 }
 
-.section-head {
+.block-head {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
-.section-head h2 {
+.block-head h2 {
   margin: 0;
-  font-size: 1rem;
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  font-weight: 700;
 }
 
-.legend {
+.block-head .sub {
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+}
+
+.key {
   display: flex;
+  flex-wrap: wrap;
   gap: 14px;
   font-size: 0.8125rem;
-  color: var(--text-muted);
+  color: var(--ink-muted);
 }
 
-.legend span {
+.key span {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-.legend i {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  background: var(--accent);
+.key i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--series-portfolio);
 }
 
-.legend .swatch-retire {
-  background: var(--growth);
+.key .k-productive { background: var(--series-productive); }
+
+.caption {
+  margin: 8px 0 0;
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
 }
 
-.legend .swatch-productive {
-  background: var(--productive);
-}
-
-.legend span[hidden] {
-  display: none;
-}
+/* ---------- Gráfico de patrimônio ---------- */
 
 .chart {
   display: block;
@@ -426,260 +554,464 @@ button:focus-visible {
   touch-action: pan-y;
 }
 
-.chart .axis-line {
-  stroke: var(--border);
-  stroke-width: 1;
-}
+.chart .axis { stroke: var(--line-strong); stroke-width: 1; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
 
-.chart .grid-line {
-  stroke: var(--border);
-  stroke-width: 1;
-  stroke-dasharray: 3 4;
-}
-
-.chart .axis-label {
-  fill: var(--text-muted);
+.chart .tick {
+  fill: var(--ink-muted);
+  font-family: var(--mono);
   font-size: 11px;
-  font-family: var(--font-num);
 }
 
-.chart .marker-line {
-  stroke: var(--border-strong);
+.chart .rule {
+  stroke: var(--line-strong);
   stroke-width: 1;
   stroke-dasharray: 4 3;
 }
 
-.chart .marker-label {
-  fill: var(--text-muted);
+.chart .rule-label {
+  fill: var(--ink-muted);
+  font-family: var(--sans);
   font-size: 11px;
-  font-family: var(--font);
 }
 
-.chart .area-accumulation {
-  fill: var(--accent);
-  opacity: 0.16;
-}
+/* Uma entidade, um tom: a carteira é sempre azul. A fase de usufruto se
+   distingue pelo traço tracejado e pelo preenchimento mais leve — nunca por
+   outra cor, que seria lida como outra série. */
+.chart .fill-portfolio { fill: var(--series-portfolio); opacity: 0.18; }
+.chart .fill-portfolio--retirement { opacity: 0.09; }
 
-.chart .area-retirement {
-  fill: var(--growth);
-  opacity: 0.16;
-}
-
-.chart .line-accumulation {
+.chart .line-portfolio {
   fill: none;
-  stroke: var(--accent);
+  stroke: var(--series-portfolio);
   stroke-width: 2;
   stroke-linejoin: round;
 }
 
-.chart .line-retirement {
-  fill: none;
-  stroke: var(--growth);
-  stroke-width: 2;
-  stroke-linejoin: round;
-}
+.chart .line-portfolio--retirement { stroke-dasharray: 6 4; }
 
-/* Faixa do patrimônio produtivo, empilhada por baixo da carteira: o topo da
-   pilha é o patrimônio total. */
-.chart .area-productive {
-  fill: var(--productive);
-  opacity: 0.22;
-}
+.chart .fill-productive { fill: var(--series-productive); opacity: 0.2; }
 
 .chart .line-productive {
   fill: none;
-  stroke: var(--productive);
+  stroke: var(--series-productive);
   stroke-width: 1.5;
   stroke-linejoin: round;
 }
 
-.chart .hover-line {
-  stroke: var(--text-muted);
-  stroke-width: 1;
-}
-
-.chart .hover-dot {
-  fill: var(--surface);
+.chart .peak {
+  fill: var(--series-portfolio);
+  stroke: var(--surface);
   stroke-width: 2;
 }
 
-.chart .hover-box {
+.chart .probe { stroke: var(--ink-muted); stroke-width: 1; }
+
+.chart .probe-dot {
   fill: var(--surface);
-  stroke: var(--border-strong);
+  stroke: var(--series-portfolio);
+  stroke-width: 2;
 }
 
-.chart .hover-text {
-  fill: var(--text);
-  font-size: 12px;
-  font-family: var(--font-num);
-}
+.chart .probe-box { fill: var(--surface); stroke: var(--line-strong); }
 
-.chart .hover-text-label {
-  fill: var(--text-muted);
+.chart .probe-age {
+  fill: var(--ink-muted);
+  font-family: var(--sans);
   font-size: 11px;
-  font-family: var(--font);
 }
 
-/* ---------- Composição ---------- */
-
-.breakdown {
-  padding: 18px 20px 20px;
+.chart .probe-value {
+  fill: var(--ink);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 600;
 }
 
-.stack-bar {
+/* A máscara abre da esquerda para a direita, revelando a linha do tempo. */
+.chart .reveal {
+  transform-box: fill-box;
+  transform-origin: left center;
+}
+
+.chart .reveal--animate {
+  animation: reveal 0.85s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes reveal {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* ---------- Composição da renda ---------- */
+
+.mix {
   display: flex;
-  height: 12px;
+  height: 14px;
   border-radius: 999px;
   overflow: hidden;
-  background: var(--surface-alt);
+  background: var(--surface-2);
+  gap: 2px;
   margin-bottom: 14px;
 }
 
-.stack-bar span {
+.mix-segment {
   display: block;
   min-width: 0;
+  transition: flex-basis 0.4s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
-.stack-bar .seg-initial {
-  background: var(--border-strong);
-}
+.mix-segment--portfolio { background: var(--series-portfolio); }
+.mix-segment--other { background: var(--series-other); }
+.mix-segment--passive { background: var(--series-productive); }
 
-.stack-bar .seg-contributed {
-  background: var(--accent);
-}
-
-.stack-bar .seg-passive {
-  background: var(--productive);
-}
-
-.stack-bar .seg-growth {
-  background: var(--growth);
-}
-
-.breakdown-list {
+.mix-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
   margin: 0;
 }
 
-/* Itens de grade esticam à altura da linha, então ancorar o valor na base
-   alinha todos mesmo quando um rótulo quebra em duas linhas. */
-.breakdown-list div {
+.mix-item {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 3px;
+  gap: 2px;
 }
 
-.breakdown-list dt {
+.mix-item dt {
   display: flex;
   align-items: center;
   gap: 7px;
   font-size: 0.8125rem;
-  color: var(--text-muted);
+  color: var(--ink-muted);
 }
 
-.breakdown-list dt::before {
+.mix-item dt::before {
   content: "";
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   border-radius: 2px;
-  background: var(--border-strong);
   flex-shrink: 0;
+  background: var(--line-strong);
 }
 
-.breakdown-list dt[data-seg="contributed"]::before {
-  background: var(--accent);
-}
+.mix-item dt[data-source="portfolio"]::before { background: var(--series-portfolio); }
+.mix-item dt[data-source="other"]::before { background: var(--series-other); }
+.mix-item dt[data-source="passive"]::before { background: var(--series-productive); }
 
-.breakdown-list dt[data-seg="passive"]::before {
-  background: var(--productive);
-}
-
-.breakdown-list dt[data-seg="growth"]::before {
-  background: var(--growth);
-}
-
-.breakdown-list dd {
+.mix-item dd {
   margin: 0;
-  font-family: var(--font-num);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+/* ---------- Composição do patrimônio ---------- */
+
+.stack {
+  display: flex;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-2);
+  gap: 2px;
+  margin-bottom: 15px;
+}
+
+.stack span {
+  display: block;
+  min-width: 0;
+  transition: flex-basis 0.4s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.stack .s-initial { background: var(--line-strong); }
+.stack .s-paid { background: var(--series-portfolio); }
+.stack .s-passive { background: var(--series-productive); }
+.stack .s-growth { background: var(--series-other); }
+
+.parts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+/* Itens de grade esticam à altura da linha, então ancorar o valor na base
+   alinha todos mesmo quando um rótulo quebra em duas linhas. */
+.parts > div {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 2px;
+}
+
+.parts dt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+}
+
+.parts dt::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  background: var(--line-strong);
+}
+
+.parts dt[data-part="paid"]::before { background: var(--series-portfolio); }
+.parts dt[data-part="passive"]::before { background: var(--series-productive); }
+.parts dt[data-part="growth"]::before { background: var(--series-other); }
+
+.parts dd {
+  margin: 0;
+  font-family: var(--mono);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
 
-/* ---------- Premissas e tabela ---------- */
+/* ---------- Sensibilidade ---------- */
 
-details.panel {
-  padding: 0;
+.levers {
+  display: grid;
+  gap: 7px;
 }
 
-details > summary {
-  padding: 14px 20px;
+.lever {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 1.4fr) minmax(0, auto);
+  align-items: center;
+  gap: 12px;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 560px) {
+  .lever {
+    grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+  }
+  .lever-track { grid-column: 1 / -1; order: 3; }
+}
+
+.lever-label { color: var(--ink); }
+
+.lever-track {
+  position: relative;
+  height: 16px;
+  border-radius: 3px;
+  background: var(--surface-2);
+}
+
+/* A régua do zero fica no centro: à direita melhora, à esquerda piora. */
+.lever-track::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--line-strong);
+}
+
+.lever-bar {
+  position: absolute;
+  top: 3px;
+  height: 10px;
+  border-radius: 3px;
+  transition: width 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.lever[data-sign="positive"] .lever-bar {
+  left: 50%;
+  background: var(--good);
+}
+
+.lever[data-sign="negative"] .lever-bar {
+  right: 50%;
+  background: var(--bad);
+}
+
+.lever-value {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
   font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.lever[data-sign="positive"] .lever-value { color: var(--good); }
+.lever[data-sign="negative"] .lever-value { color: var(--bad); }
+
+/* ---------- Queda de mercado ---------- */
+
+.crashes {
+  display: grid;
+  gap: 9px;
+}
+
+.crash {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(120px, 1fr) minmax(0, auto);
+  align-items: center;
+  gap: 12px;
+  font-size: 0.875rem;
+}
+
+.crash-label { color: var(--ink); white-space: nowrap; }
+
+.crash-track {
+  position: relative;
+  height: 16px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  overflow: visible;
+}
+
+.crash-bar {
+  position: absolute;
+  left: 0;
+  top: 3px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--series-portfolio);
+  transition: width 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.crash[data-covered="no"] .crash-bar { background: var(--short); }
+
+/* A meta é uma régua vertical: dá para ver de relance qual queda o plano
+   ainda aguenta. */
+.crash-goal {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--ink-muted);
+  transition: left 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.crash-value {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.crash[data-covered="no"] .crash-value { color: var(--short); }
+
+/* ---------- Medidor de taxa de retirada ---------- */
+
+.gauge {
+  display: grid;
+  gap: 8px;
+}
+
+.gauge-track {
+  position: relative;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--good) 0%,
+    var(--good) 45%,
+    var(--short) 62%,
+    var(--bad) 100%
+  );
+}
+
+.gauge-needle {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--ink);
+  box-shadow: 0 0 0 2px var(--surface);
+  transition: left 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.gauge-scale {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  color: var(--ink-muted);
+}
+
+/* ---------- Disclosures ---------- */
+
+details {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+summary {
+  padding: 14px 20px;
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  font-weight: 700;
   cursor: pointer;
   list-style: none;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
 }
 
-details > summary::-webkit-details-marker {
-  display: none;
-}
+summary::-webkit-details-marker { display: none; }
 
-details > summary::before {
-  content: "▸";
-  color: var(--text-muted);
+summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 5px solid var(--ink-muted);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
   transition: transform 0.15s ease;
 }
 
-details[open] > summary::before {
-  transform: rotate(90deg);
-}
+details[open] summary::before { transform: rotate(90deg); }
 
-details > summary:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
+.details-body { padding: 0 20px 18px; }
 
-.details-body {
-  padding: 0 20px 18px;
-}
-
-.assumption-list {
+.assumptions {
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px 20px;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: 9px 22px;
 }
 
-.assumption-list div {
+.assumptions > div {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   gap: 12px;
   padding-bottom: 6px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--line);
   font-size: 0.875rem;
 }
 
-.assumption-list dt {
-  color: var(--text-muted);
-}
+.assumptions dt { color: var(--ink-muted); }
 
-.assumption-list dd {
+.assumptions dd {
   margin: 0;
-  font-family: var(--font-num);
+  font-family: var(--mono);
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
 
 .table-scroll {
-  overflow-x: auto;
-  max-height: 420px;
-  overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  overflow: auto;
+  max-height: 400px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
 }
 
 table {
@@ -691,8 +1023,9 @@ table {
 thead th {
   position: sticky;
   top: 0;
-  background: var(--surface-alt);
-  border-bottom: 1px solid var(--border-strong);
+  z-index: 1;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line-strong);
   padding: 9px 12px;
   text-align: right;
   font-weight: 600;
@@ -707,46 +1040,40 @@ tbody td:first-child {
 tbody td {
   padding: 7px 12px;
   text-align: right;
-  border-bottom: 1px solid var(--border);
-  font-family: var(--font-num);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-tbody tr:last-child td {
-  border-bottom: 0;
+tbody tr:last-child td { border-bottom: 0; }
+
+/* A fase da linha se lê pela forma, não só pelo texto. */
+tbody tr[data-phase="accumulation"] td:first-child {
+  box-shadow: inset 3px 0 0 var(--series-portfolio);
 }
 
-tbody tr[data-phase="retirement"] {
-  background: color-mix(in srgb, var(--growth) 6%, transparent);
+tbody tr[data-phase="retirement"] td:first-child {
+  box-shadow: inset 3px 0 0 var(--series-other);
 }
 
-tbody td.negative {
-  color: var(--warn);
-}
+tbody td.debit { color: var(--short); }
 
-.footnote {
-  margin: 4px 0 0;
-  font-size: 0.8125rem;
-  color: var(--text-muted);
-}
-
-.page-footer {
-  margin-top: 32px;
+.colophon {
+  margin-top: 30px;
   padding-top: 16px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--line);
   font-size: 0.8125rem;
-  color: var(--text-muted);
+  color: var(--ink-muted);
+  max-width: 78ch;
 }
 
-.visually-hidden {
+.sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
   margin: -1px;
-  padding: 0;
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
-  border: 0;
 }
