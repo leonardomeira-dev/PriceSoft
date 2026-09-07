@@ -26,8 +26,9 @@ npm test           # node:test, sem dependências
 ```
 
 Os testes cobrem o motor de cálculo (`src/retirement.js`): equivalência de taxas, fórmulas
-fechadas de valor futuro e de anuidade, esgotamento do saldo, herança e os casos de contorno
-de taxa real nula ou negativa.
+fechadas de valor futuro e de anuidade, esgotamento do saldo, herança, patrimônio produtivo e
+renda passiva (reinvestida, consumida e com venda do bem), além dos casos de contorno de taxa
+real nula ou negativa.
 
 ## Como o cálculo funciona
 
@@ -51,6 +52,32 @@ A partir daí:
 
 Se o aporte não for corrigido pela inflação, ele perde poder de compra a cada mês; a simulação
 representa isso encolhendo o aporte em termos reais, e o patrimônio final cai.
+
+## Patrimônio produtivo e renda passiva
+
+Carteira financeira e patrimônio produtivo são coisas diferentes, e o cálculo trata cada uma
+como tal:
+
+- A **carteira** acumula e depois é **consumida** — é ela que zera no fim do plano.
+- O **patrimônio produtivo** (imóvel alugado, participação em negócio) **não é consumido**: ele
+  continua rendendo e sobra como herança.
+
+Disso vêm três efeitos que mudam bastante o resultado:
+
+1. **A renda passiva já existe hoje.** Se for reinvestida, entra na acumulação como um segundo
+   fluxo mensal, ao lado do aporte.
+2. **Ela continua na aposentadoria.** Some da renda desejada junto com o INSS, então a carteira
+   precisa cobrir só a diferença — e o patrimônio necessário cai na mesma proporção.
+3. **Vender o bem troca renda por saldo.** O valor de mercado vira carteira consumível e a renda
+   passiva acaba; a calculadora mostra os dois cenários lado a lado.
+
+A renda passiva acompanha o valor do bem que a gera — o rendimento percentual fica constante,
+então ambos crescem à mesma taxa real. A valorização é informada **já em termos reais** (acima da
+inflação), então não passa por Fisher; zero significa apenas manter o poder de compra. Durante a
+aposentadoria a renda passiva é tratada como constante em termos reais, premissa conservadora.
+
+O segundo fluxo entra no termo constante da acumulação, nunca no marginal, então o aporte
+necessário continua saindo por solução exata.
 
 ## Estrutura
 

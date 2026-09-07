@@ -326,3 +326,160 @@ test('flowSeries acompanha balanceSeries e reconcilia saldo com rendimento', () 
     1e-6,
   );
 });
+
+/* ---------- Patrimônio produtivo e renda passiva ---------- */
+
+/** Plano com um imóvel alugado: R$ 400 mil que rendem R$ 2.000 por mês hoje. */
+const comImovel = {
+  ...basePlan,
+  productiveAssets: 400_000,
+  passiveIncome: 2_000,
+  productiveRealGrowth: 0,
+  reinvestPassiveIncome: true,
+  sellProductiveAtRetirement: false,
+};
+
+test('sem patrimônio produtivo o resultado é idêntico ao plano antigo', () => {
+  const semCampos = project(basePlan);
+  const comZeros = project({ ...basePlan, productiveAssets: 0, passiveIncome: 0 });
+
+  closeTo(comZeros.balanceAtRetirement, semCampos.balanceAtRetirement, 1e-9);
+  closeTo(comZeros.targetBalance, semCampos.targetBalance, 1e-9);
+  assert.equal(comZeros.productiveAtRetirement, 0);
+  assert.equal(comZeros.passiveDuringRetirement, 0);
+});
+
+test('renda passiva reinvestida engorda a carteira', () => {
+  const reinveste = project(comImovel);
+  const consome = project({ ...comImovel, reinvestPassiveIncome: false });
+
+  assert.ok(reinveste.portfolioAtRetirement > consome.portfolioAtRetirement);
+  closeTo(reinveste.totalPassiveReinvested, 2_000 * 420);
+  assert.equal(consome.totalPassiveReinvested, 0);
+
+  // O ganho vem do fluxo extra e dos juros sobre ele, nunca do aporte declarado.
+  closeTo(reinveste.totalContributed, consome.totalContributed, 1e-9);
+});
+
+test('renda passiva continua na aposentadoria e alivia a carteira', () => {
+  const semImovel = project(basePlan);
+  const comAluguel = project({ ...comImovel, reinvestPassiveIncome: false });
+
+  // A carteira precisa cobrir R$ 2.000 a menos por mês.
+  closeTo(comAluguel.neededFromPortfolio, semImovel.neededFromPortfolio - 2_000);
+  assert.ok(comAluguel.targetBalance < semImovel.targetBalance);
+  closeTo(comAluguel.supplementalIncome, basePlan.otherMonthlyIncome + 2_000);
+});
+
+test('a renda projetada soma carteira, INSS e renda passiva', () => {
+  const result = project(comImovel);
+  closeTo(
+    result.projectedMonthlyIncome,
+    result.sustainableIncome + basePlan.otherMonthlyIncome + result.passiveDuringRetirement,
+  );
+});
+
+test('vender o patrimônio produtivo troca renda passiva por saldo', () => {
+  const mantem = project(comImovel);
+  const vende = project({ ...comImovel, sellProductiveAtRetirement: true });
+
+  // O valor do bem entra na carteira consumível...
+  closeTo(vende.balanceAtRetirement, vende.portfolioAtRetirement + vende.productiveAtRetirement, 1e-6);
+  assert.ok(vende.balanceAtRetirement > mantem.balanceAtRetirement);
+
+  // ...e a renda passiva acaba.
+  assert.equal(vende.passiveDuringRetirement, 0);
+  assert.ok(vende.neededFromPortfolio > mantem.neededFromPortfolio);
+
+  // Nada do bem sobra para os herdeiros depois da venda.
+  assert.equal(vende.productiveAtEnd, 0);
+});
+
+test('a valorização real faz bem e renda crescerem juntos', () => {
+  const parado = project(comImovel);
+  const valoriza = project({ ...comImovel, productiveRealGrowth: 0.02 });
+
+  assert.ok(valoriza.productiveAtRetirement > parado.productiveAtRetirement);
+  assert.ok(valoriza.passiveAtRetirement > parado.passiveAtRetirement);
+
+  // O rendimento percentual do bem não muda: os dois crescem na mesma proporção.
+  closeTo(
+    valoriza.passiveAtRetirement / valoriza.productiveAtRetirement,
+    parado.passiveAtRetirement / parado.productiveAtRetirement,
+    1e-9,
+  );
+
+  // 400 mil a 2% reais ao ano por 35 anos.
+  closeTo(valoriza.productiveAtRetirement, 400_000 * Math.pow(1.02, 35), 1);
+});
+
+test('valorização real zero mantém o poder de compra do bem', () => {
+  const result = project(comImovel);
+  closeTo(result.productiveAtRetirement, 400_000, 1e-6);
+  closeTo(result.passiveAtRetirement, 2_000, 1e-9);
+});
+
+test('o aporte necessário fecha a conta mesmo com renda passiva reinvestida', () => {
+  // Meta alta o bastante para a carteira ainda ter trabalho depois do aluguel.
+  const magro = { ...comImovel, monthlyContribution: 50, desiredMonthlyIncome: 30_000 };
+  const result = project(magro);
+  assert.equal(result.onTrack, false);
+
+  const corrigido = project({ ...magro, monthlyContribution: result.requiredMonthlyContribution });
+  assert.equal(corrigido.onTrack, true);
+  closeTo(corrigido.sustainableIncome, corrigido.neededFromPortfolio, 1e-6);
+});
+
+test('o aporte necessário fecha a conta também quando o bem é vendido', () => {
+  const magro = {
+    ...comImovel,
+    monthlyContribution: 50,
+    desiredMonthlyIncome: 30_000,
+    sellProductiveAtRetirement: true,
+  };
+  const result = project(magro);
+  assert.equal(result.onTrack, false);
+
+  const corrigido = project({ ...magro, monthlyContribution: result.requiredMonthlyContribution });
+  assert.equal(corrigido.onTrack, true);
+  closeTo(corrigido.balanceAtRetirement, corrigido.targetBalance, 1e-6);
+});
+
+test('o bem mantido soma à herança, mas não ao alvo da carteira', () => {
+  const result = project({ ...comImovel, legacy: 0 });
+
+  closeTo(result.productiveAtEnd, 400_000, 1e-6);
+  closeTo(result.estateAtEnd, result.legacyAtEnd + 400_000, 1e-6);
+  // A carteira segue zerando no fim: o alvo não conta com o imóvel.
+  closeTo(result.legacyAtEnd, 0, 1e-4);
+});
+
+test('productiveSeries acompanha balanceSeries mês a mês', () => {
+  const result = project(comImovel);
+  assert.equal(result.productiveSeries.length, result.balanceSeries.length);
+  closeTo(result.productiveSeries[0], 400_000, 1e-9);
+  closeTo(result.productiveSeries[result.accumulationMonths], 400_000, 1e-6);
+});
+
+test('flowSeries inclui a renda passiva reinvestida', () => {
+  const reinveste = project(comImovel);
+  const consome = project({ ...comImovel, reinvestPassiveIncome: false });
+
+  // No primeiro mês entram o aporte e a renda passiva.
+  closeTo(reinveste.flowSeries[1], basePlan.monthlyContribution + 2_000);
+  closeTo(consome.flowSeries[1], basePlan.monthlyContribution);
+});
+
+test('renda passiva suficiente dispensa a carteira por completo', () => {
+  const result = project({ ...comImovel, passiveIncome: 9_000 });
+  assert.equal(result.neededFromPortfolio, 0);
+  assert.equal(result.targetBalance, 0);
+  assert.equal(result.onTrack, true);
+  assert.equal(result.requiredMonthlyContribution, 0);
+});
+
+test('validate rejeita patrimônio produtivo e renda passiva negativos', () => {
+  assert.deepEqual(validate(comImovel), []);
+  assert.ok(validate({ ...comImovel, productiveAssets: -1 }).length > 0);
+  assert.ok(validate({ ...comImovel, passiveIncome: -1 }).length > 0);
+});

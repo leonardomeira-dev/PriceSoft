@@ -18,6 +18,7 @@
   --warn: #b4530a;
   --warn-soft: #fdeedd;
   --danger: #c0342b;
+  --productive: #8a6d3b;
 
   --radius: 12px;
   --radius-sm: 8px;
@@ -44,6 +45,7 @@
     --warn: #f0a55c;
     --warn-soft: #35250f;
     --danger: #ff8578;
+    --productive: #c9a227;
 
     --shadow: 0 1px 2px rgb(0 0 0 / 35%), 0 8px 24px rgb(0 0 0 / 30%);
   }
@@ -124,6 +126,13 @@ body {
 .results {
   display: grid;
   gap: 20px;
+  min-width: 0;
+}
+
+/* Itens de grade têm `min-width: auto` e se recusam a encolher abaixo do próprio
+   conteúdo. Sem isto, a tabela larga empurra a página inteira em vez de rolar
+   dentro do seu container. */
+.results > * {
   min-width: 0;
 }
 
@@ -402,6 +411,14 @@ button:focus-visible {
   background: var(--growth);
 }
 
+.legend .swatch-productive {
+  background: var(--productive);
+}
+
+.legend span[hidden] {
+  display: none;
+}
+
 .chart {
   display: block;
   width: 100%;
@@ -462,6 +479,20 @@ button:focus-visible {
   stroke-linejoin: round;
 }
 
+/* Faixa do patrimônio produtivo, empilhada por baixo da carteira: o topo da
+   pilha é o patrimônio total. */
+.chart .area-productive {
+  fill: var(--productive);
+  opacity: 0.22;
+}
+
+.chart .line-productive {
+  fill: none;
+  stroke: var(--productive);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
 .chart .hover-line {
   stroke: var(--text-muted);
   stroke-width: 1;
@@ -517,6 +548,10 @@ button:focus-visible {
   background: var(--accent);
 }
 
+.stack-bar .seg-passive {
+  background: var(--productive);
+}
+
 .stack-bar .seg-growth {
   background: var(--growth);
 }
@@ -553,6 +588,10 @@ button:focus-visible {
 
 .breakdown-list dt[data-seg="contributed"]::before {
   background: var(--accent);
+}
+
+.breakdown-list dt[data-seg="passive"]::before {
+  background: var(--productive);
 }
 
 .breakdown-list dt[data-seg="growth"]::before {

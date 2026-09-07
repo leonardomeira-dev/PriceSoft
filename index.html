@@ -99,6 +99,69 @@
           </fieldset>
 
           <fieldset>
+            <legend>Patrimônio produtivo</legend>
+
+            <div class="field">
+              <label for="productiveAssets">Imóveis, negócio, participações</label>
+              <div class="input-wrap">
+                <span class="affix">R$</span>
+                <input id="productiveAssets" name="productiveAssets" type="number" min="0" step="10000" value="0" />
+              </div>
+              <span class="hint">
+                Valor de mercado hoje. Diferente da carteira: não é consumido, continua rendendo.
+              </span>
+            </div>
+
+            <div class="field">
+              <label for="passiveIncome">Renda passiva que já recebo</label>
+              <div class="input-wrap">
+                <span class="affix">R$</span>
+                <input id="passiveIncome" name="passiveIncome" type="number" min="0" step="500" value="0" />
+                <span class="affix">/ mês</span>
+              </div>
+              <span class="hint">Aluguéis, pró-labore de sócio, dividendos recorrentes.</span>
+            </div>
+
+            <div class="field">
+              <label for="productiveRealGrowth">Valorização acima da inflação</label>
+              <div class="input-wrap">
+                <input
+                  id="productiveRealGrowth"
+                  name="productiveRealGrowth"
+                  type="number"
+                  min="-10"
+                  max="15"
+                  step="0.25"
+                  value="0"
+                />
+                <span class="affix">% a.a. real</span>
+              </div>
+              <span class="hint">
+                Zero mantém o poder de compra. A renda passiva acompanha o valor do bem.
+              </span>
+            </div>
+
+            <div class="field">
+              <label class="checkbox" for="reinvestPassiveIncome">
+                <input id="reinvestPassiveIncome" name="reinvestPassiveIncome" type="checkbox" checked />
+                <span>Reinvisto a renda passiva enquanto trabalho</span>
+              </label>
+            </div>
+
+            <div class="field">
+              <label class="checkbox" for="sellProductiveAtRetirement">
+                <input
+                  id="sellProductiveAtRetirement"
+                  name="sellProductiveAtRetirement"
+                  type="checkbox"
+                />
+                <span>Vendo o patrimônio produtivo ao me aposentar</span>
+              </label>
+              <span class="hint">Vira carteira para consumir — e a renda passiva acaba.</span>
+            </div>
+          </fieldset>
+
+          <fieldset>
             <legend>Premissas de mercado</legend>
 
             <div class="field">
@@ -230,6 +293,7 @@
               <div class="legend">
                 <span><i></i> Acumulação</span>
                 <span><i class="swatch-retire"></i> Aposentadoria</span>
+                <span id="key-productive" hidden><i class="swatch-productive"></i> Patrimônio produtivo</span>
               </div>
             </div>
             <svg
@@ -254,6 +318,7 @@
             <div class="stack-bar" id="stack-bar" aria-hidden="true">
               <span class="seg-initial" id="seg-initial"></span>
               <span class="seg-contributed" id="seg-contributed"></span>
+              <span class="seg-passive" id="seg-passive"></span>
               <span class="seg-growth" id="seg-growth"></span>
             </div>
             <dl class="breakdown-list">
@@ -264,6 +329,10 @@
               <div>
                 <dt data-seg="contributed">Aportes futuros</dt>
                 <dd id="value-contributed"></dd>
+              </div>
+              <div id="part-passive" hidden>
+                <dt data-seg="passive">Renda passiva reinvestida</dt>
+                <dd id="value-passive"></dd>
               </div>
               <div>
                 <dt data-seg="growth">Rendimentos reais</dt>
@@ -294,6 +363,7 @@
                       <th scope="col">Aportes / retiradas</th>
                       <th scope="col">Rendimento real</th>
                       <th scope="col">Saldo no fim do ano</th>
+                      <th scope="col" id="th-productive" hidden>Patrimônio produtivo</th>
                     </tr>
                   </thead>
                   <tbody id="table-body"></tbody>

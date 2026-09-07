@@ -74,6 +74,11 @@ function readPlan() {
     desiredMonthlyIncome: number('desiredMonthlyIncome'),
     otherMonthlyIncome: number('otherMonthlyIncome'),
     legacy: number('legacy'),
+    productiveAssets: number('productiveAssets'),
+    passiveIncome: number('passiveIncome'),
+    productiveRealGrowth: rate('productiveRealGrowth'),
+    reinvestPassiveIncome: form.elements.reinvestPassiveIncome.checked,
+    sellProductiveAtRetirement: form.elements.sellProductiveAtRetirement.checked,
   };
 }
 
@@ -131,6 +136,9 @@ function samplePoints(result, plan) {
       month,
       age: plan.currentAge + month / 12,
       value: result.balanceSeries[month],
+      productive: result.productiveSeries[month],
+      // O topo da pilha é o patrimônio total: carteira sobre o bem produtivo.
+      total: result.balanceSeries[month] + result.productiveSeries[month],
     }));
 }
 
@@ -138,7 +146,7 @@ function renderChart(result, plan) {
   chart.replaceChildren(chartTitle);
 
   const points = samplePoints(result, plan);
-  const maxValue = niceCeil(Math.max(...points.map((point) => point.value), 1));
+  const maxValue = niceCeil(Math.max(...points.map((point) => point.total), 1));
   const startAge = plan.currentAge;
   const spanYears = Math.max(plan.endAge - plan.currentAge, 1);
 
@@ -198,26 +206,42 @@ function renderChart(result, plan) {
   const accumulation = points.filter((point) => point.month <= result.accumulationMonths);
   const retirement = points.filter((point) => point.month >= result.accumulationMonths);
 
-  const toPath = (list) => list.map((point) => `${x(point.age)},${y(point.value)}`).join(' L ');
+  const topPath = (list) => list.map((point) => `${x(point.age)},${y(point.total)}`).join(' L ');
 
+  // Cada fase é uma faixa entre o topo do patrimônio produtivo e o patrimônio
+  // total, para que a carteira apareça empilhada sobre o bem em vez de escondê-lo.
   const addPhase = (list, areaClass, lineClass) => {
     if (list.length < 2) return;
-    const path = toPath(list);
-    const first = list[0];
-    const last = list[list.length - 1];
+    const top = topPath(list);
+    const floor = [...list]
+      .reverse()
+      .map((point) => `${x(point.age)},${y(point.productive)}`)
+      .join(' L ');
     layer.append(
-      svgEl('path', {
-        class: areaClass,
-        d: `M ${x(first.age)},${baseline} L ${path} L ${x(last.age)},${baseline} Z`,
-      }),
-      svgEl('path', { class: lineClass, d: `M ${path}` }),
+      svgEl('path', { class: areaClass, d: `M ${top} L ${floor} Z` }),
+      svgEl('path', { class: lineClass, d: `M ${top}` }),
     );
   };
 
   addPhase(accumulation, 'area-accumulation', 'line-accumulation');
   addPhase(retirement, 'area-retirement', 'line-retirement');
 
+  if (points.some((point) => point.productive > 0)) {
+    const productive = points.map((point) => `${x(point.age)},${y(point.productive)}`).join(' L ');
+    const first = points[0];
+    const last = points[points.length - 1];
+    layer.append(
+      svgEl('path', {
+        class: 'area-productive',
+        d: `M ${x(first.age)},${baseline} L ${productive} L ${x(last.age)},${baseline} Z`,
+      }),
+      svgEl('path', { class: 'line-productive', d: `M ${productive}` }),
+    );
+  }
+
   // Marcador da aposentadoria.
+  document.getElementById('key-productive').hidden = !(plan.productiveAssets > 0);
+
   const retirementX = x(plan.retirementAge);
   layer.append(
     svgEl('line', { class: 'marker-line', x1: retirementX, x2: retirementX, y1: PAD.top, y2: baseline }),
@@ -270,7 +294,7 @@ function attachHover(svg, points, { x, y, baseline }) {
     }
 
     const pointX = x(nearest.age);
-    const pointY = y(nearest.value);
+    const pointY = y(nearest.total);
     const isAccumulation = nearest.month <= 0 || pointY <= baseline;
 
     line.setAttribute('x1', pointX);
@@ -290,7 +314,7 @@ function attachHover(svg, points, { x, y, baseline }) {
     valueText.setAttribute('x', boxX + 12);
     valueText.setAttribute('y', boxY + 34);
     ageText.textContent = `${Math.round(nearest.age)} anos`;
-    valueText.textContent = currency.format(nearest.value);
+    valueText.textContent = currency.format(nearest.total);
 
     hover.style.display = '';
   };
@@ -309,17 +333,22 @@ function attachHover(svg, points, { x, y, baseline }) {
 function renderBreakdown(result, plan) {
   const initial = Math.max(0, plan.initialBalance);
   const contributed = Math.max(0, result.totalContributed);
+  const passive = Math.max(0, result.totalPassiveReinvested);
   const growth = Math.max(0, result.investmentGrowth);
-  const total = initial + contributed + growth || 1;
+  const total = initial + contributed + passive + growth || 1;
 
   const share = (value) => `${(value / total) * 100}%`;
   document.getElementById('seg-initial').style.flexBasis = share(initial);
   document.getElementById('seg-contributed').style.flexBasis = share(contributed);
+  document.getElementById('seg-passive').style.flexBasis = share(passive);
   document.getElementById('seg-growth').style.flexBasis = share(growth);
 
   text('value-initial', money(initial));
   text('value-contributed', money(contributed));
+  text('value-passive', money(passive));
   text('value-growth', money(result.investmentGrowth));
+
+  document.getElementById('part-passive').hidden = passive <= 0;
 }
 
 /* ---------- Premissas ---------- */
@@ -333,8 +362,18 @@ function renderAssumptions(result, plan) {
     ['Inflação considerada', percent.format(plan.inflation)],
     ['Aporte corrigido pela inflação', plan.indexContribution ? 'Sim' : 'Não'],
     ['Herança planejada', money(plan.legacy)],
-    ['Saldo ao fim do período', money(result.legacyAtEnd)],
+    ['Saldo da carteira ao fim', money(result.legacyAtEnd)],
   ];
+
+  if (plan.productiveAssets > 0 || plan.passiveIncome > 0) {
+    rows.push(
+      ['Patrimônio produtivo ao se aposentar', money(result.productiveAtRetirement)],
+      ['Renda passiva ao se aposentar', money(result.passiveAtRetirement)],
+      ['Renda passiva na aposentadoria', money(result.passiveDuringRetirement)],
+      ['Renda passiva reinvestida', money(result.totalPassiveReinvested)],
+      ['Patrimônio total deixado', money(result.estateAtEnd)],
+    );
+  }
 
   const list = document.getElementById('assumptions');
   list.replaceChildren(
@@ -356,6 +395,10 @@ function renderTable(result, plan) {
   const lastMonth = result.balanceSeries.length - 1;
   const body = document.getElementById('table-body');
   const rows = [];
+
+  // A coluna do bem produtivo só aparece quando há um: uma coluna de zeros é ruído.
+  const showProductive = result.productiveSeries.some((value) => value > 0);
+  document.getElementById('th-productive').hidden = !showProductive;
 
   for (let start = 0; start < lastMonth; start += 12) {
     const end = Math.min(start + 12, lastMonth);
@@ -379,6 +422,8 @@ function renderTable(result, plan) {
       [money(closing), false],
     ];
 
+    if (showProductive) cells.push([money(result.productiveSeries[end]), false]);
+
     for (const [value, negative] of cells) {
       const cell = document.createElement('td');
       cell.textContent = value;
@@ -400,11 +445,11 @@ function renderVerdict(result, plan) {
 
   if (result.neededFromPortfolio === 0) {
     verdict.dataset.status = 'good';
-    text('verdict-title', 'Suas outras rendas já cobrem a meta');
+    text('verdict-title', 'Suas rendas fora da carteira já cobrem a meta');
     text(
       'verdict-detail',
-      `${money(plan.otherMonthlyIncome)} por mês de INSS e outras fontes já atendem os ` +
-        `${money(plan.desiredMonthlyIncome)} desejados. Tudo que você acumular vira folga.`,
+      `${money(result.supplementalIncome)} por mês entre INSS, aluguéis e outras fontes já ` +
+        `atendem os ${money(plan.desiredMonthlyIncome)} desejados. Tudo que você acumular vira folga.`,
     );
     return;
   }
@@ -446,14 +491,21 @@ function renderCards(result, plan) {
   const incomeCard = document.getElementById('card-income');
   incomeCard.dataset.tone = result.onTrack ? 'good' : 'short';
   text('value-income', money(result.projectedMonthlyIncome));
-  text(
-    'note-income',
-    `Meta: ${money(plan.desiredMonthlyIncome)} · carteira ${money(result.sustainableIncome)} + ` +
-      `outras rendas ${money(plan.otherMonthlyIncome)}`,
-  );
+  const sources = [`carteira ${money(result.sustainableIncome)}`];
+  if (plan.otherMonthlyIncome > 0) sources.push(`INSS e outras ${money(plan.otherMonthlyIncome)}`);
+  if (result.passiveDuringRetirement > 0) {
+    sources.push(`renda passiva ${money(result.passiveDuringRetirement)}`);
+  }
+  text('note-income', `Meta: ${money(plan.desiredMonthlyIncome)} · ${sources.join(' + ')}`);
 
   text('value-balance', money(result.balanceAtRetirement));
-  text('note-balance', `Em ${years(plan.retirementAge - plan.currentAge)}, em valores de hoje`);
+  text(
+    'note-balance',
+    result.productiveAtEnd > 0
+      ? `Em ${years(plan.retirementAge - plan.currentAge)} · mais ` +
+        `${money(result.productiveAtRetirement)} em patrimônio produtivo mantido`
+      : `Em ${years(plan.retirementAge - plan.currentAge)}, em valores de hoje`,
+  );
 
   text('value-target', money(result.targetBalance));
   text(

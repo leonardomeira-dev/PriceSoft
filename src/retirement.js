@@ -61,10 +61,15 @@ export function annuityPresentValueFactor(rate, periods) {
  * @param {number} params.monthlyRate taxa real mensal
  * @param {number} params.months número de meses
  * @param {number} [params.contributionGrowth] variação real mensal do aporte
- * @returns {{balance: number, totalContributed: number, series: number[],
- *            contributions: number[]}}
+ * @param {number} [params.extraContribution] segundo fluxo aportado no primeiro mês,
+ *   usado para a renda passiva reinvestida — cresce por conta própria e, por não
+ *   depender do aporte, preserva a linearidade explorada por
+ *   {@link solveMonthlyContribution}
+ * @param {number} [params.extraGrowth] variação real mensal do segundo fluxo
+ * @returns {{balance: number, totalContributed: number, totalExtra: number,
+ *            series: number[], contributions: number[], extras: number[]}}
  *   `series[m]` é o saldo ao fim do mês `m`, com `series[0]` igual ao saldo inicial;
- *   `contributions[m]` é o aporte feito no mês `m` (`contributions[0]` é sempre 0).
+ *   `contributions[m]` e `extras[m]` são os dois fluxos do mês `m` (índice 0 é sempre 0).
  */
 export function accumulate({
   initialBalance,
@@ -72,22 +77,30 @@ export function accumulate({
   monthlyRate,
   months,
   contributionGrowth = 0,
+  extraContribution = 0,
+  extraGrowth = 0,
 }) {
   const series = [initialBalance];
   const contributions = [0];
+  const extras = [0];
   let balance = initialBalance;
   let contribution = monthlyContribution;
+  let extra = extraContribution;
   let totalContributed = 0;
+  let totalExtra = 0;
 
   for (let month = 1; month <= months; month++) {
-    balance = balance * (1 + monthlyRate) + contribution;
+    balance = balance * (1 + monthlyRate) + contribution + extra;
     totalContributed += contribution;
+    totalExtra += extra;
     contributions.push(contribution);
+    extras.push(extra);
     contribution *= 1 + contributionGrowth;
+    extra *= 1 + extraGrowth;
     series.push(balance);
   }
 
-  return { balance, totalContributed, series, contributions };
+  return { balance, totalContributed, totalExtra, series, contributions, extras };
 }
 
 /**
@@ -175,6 +188,8 @@ export function requiredBalance({ monthlyIncome, monthlyRate, months, legacy = 0
  * @param {number} params.months número de meses de acumulação
  * @param {number} params.targetBalance saldo alvo
  * @param {number} [params.contributionGrowth] variação real mensal do aporte
+ * @param {number} [params.extraContribution] fluxo paralelo (renda passiva reinvestida)
+ * @param {number} [params.extraGrowth] variação real mensal do fluxo paralelo
  * @returns {number} aporte mensal necessário (0 se o alvo já é atingido)
  */
 export function solveMonthlyContribution({
@@ -183,6 +198,8 @@ export function solveMonthlyContribution({
   months,
   targetBalance,
   contributionGrowth = 0,
+  extraContribution = 0,
+  extraGrowth = 0,
 }) {
   const withoutContributions = accumulate({
     initialBalance,
@@ -190,10 +207,14 @@ export function solveMonthlyContribution({
     monthlyRate,
     months,
     contributionGrowth,
+    extraContribution,
+    extraGrowth,
   }).balance;
 
   if (withoutContributions >= targetBalance) return 0;
 
+  // O fluxo extra entra no termo constante, não no marginal: o ganho por unidade
+  // de aporte é medido sem ele.
   const perUnitOfContribution = accumulate({
     initialBalance: 0,
     monthlyContribution: 1,
@@ -250,6 +271,12 @@ export function validate(input) {
   if (!Number.isFinite(inflation) || inflation <= -1) {
     errors.push('Informe uma inflação válida.');
   }
+  if (!Number.isFinite(input.productiveAssets ?? 0) || (input.productiveAssets ?? 0) < 0) {
+    errors.push('O patrimônio produtivo não pode ser negativo.');
+  }
+  if (!Number.isFinite(input.passiveIncome ?? 0) || (input.passiveIncome ?? 0) < 0) {
+    errors.push('A renda passiva atual não pode ser negativa.');
+  }
 
   return errors;
 }
@@ -271,8 +298,19 @@ export function validate(input) {
  * @param {number} input.inflation inflação anual esperada
  * @param {boolean} [input.indexContribution] se o aporte é corrigido pela inflação
  * @param {number} [input.desiredMonthlyIncome] renda mensal desejada (total)
- * @param {number} [input.otherMonthlyIncome] renda mensal de outras fontes (INSS etc.)
+ * @param {number} [input.otherMonthlyIncome] renda mensal de outras fontes que só
+ *   começam na aposentadoria (INSS, previdência privada)
  * @param {number} [input.legacy] herança desejada ao fim do período
+ * @param {number} [input.productiveAssets] valor de mercado hoje do patrimônio
+ *   produtivo (imóveis alugados, participação em negócio) — diferente da carteira
+ *   financeira porque não é consumido: continua rendendo
+ * @param {number} [input.passiveIncome] renda mensal que esse patrimônio já gera hoje
+ * @param {number} [input.productiveRealGrowth] valorização anual do patrimônio
+ *   produtivo **acima da inflação** (já real, não passa por Fisher)
+ * @param {boolean} [input.reinvestPassiveIncome] se a renda passiva é reinvestida na
+ *   carteira durante a acumulação, em vez de consumida
+ * @param {boolean} [input.sellProductiveAtRetirement] se o patrimônio produtivo é
+ *   vendido ao se aposentar, virando carteira e encerrando a renda passiva
  * @returns {object} resultado consolidado da projeção
  */
 export function project(input) {
@@ -289,6 +327,11 @@ export function project(input) {
     desiredMonthlyIncome = 0,
     otherMonthlyIncome = 0,
     legacy = 0,
+    productiveAssets = 0,
+    passiveIncome = 0,
+    productiveRealGrowth = 0,
+    reinvestPassiveIncome = true,
+    sellProductiveAtRetirement = false,
   } = input;
 
   const accumulationMonths = Math.round((retirementAge - currentAge) * 12);
@@ -297,9 +340,17 @@ export function project(input) {
   const accumulationRate = annualToMonthly(realAnnualRate(accumulationReturn, inflation));
   const retirementRate = annualToMonthly(realAnnualRate(retirementReturn, inflation));
 
+  // A valorização do patrimônio produtivo já é informada em termos reais, então
+  // não passa por Fisher — só pela equivalência de período.
+  const productiveRate = annualToMonthly(productiveRealGrowth);
+
   // Aporte congelado em valor nominal perde poder de compra a cada mês.
   const monthlyInflation = annualToMonthly(inflation);
   const contributionGrowth = indexContribution ? 0 : 1 / (1 + monthlyInflation) - 1;
+
+  // A renda passiva acompanha o valor do bem que a gera: o rendimento percentual
+  // fica constante, então ela cresce à mesma taxa real do patrimônio produtivo.
+  const reinvested = reinvestPassiveIncome ? passiveIncome : 0;
 
   const accumulation = accumulate({
     initialBalance,
@@ -307,9 +358,23 @@ export function project(input) {
     monthlyRate: accumulationRate,
     months: accumulationMonths,
     contributionGrowth,
+    extraContribution: reinvested,
+    extraGrowth: productiveRate,
   });
 
-  const balanceAtRetirement = accumulation.balance;
+  const portfolioAtRetirement = accumulation.balance;
+  const productiveAtRetirement = productiveAssets * Math.pow(1 + productiveRate, accumulationMonths);
+  const passiveAtRetirement = passiveIncome * Math.pow(1 + productiveRate, accumulationMonths);
+
+  // Vender o bem transforma seu valor em carteira e encerra a renda passiva;
+  // mantê-lo preserva a renda e deixa o bem fora do que é consumido.
+  const balanceAtRetirement =
+    portfolioAtRetirement + (sellProductiveAtRetirement ? productiveAtRetirement : 0);
+  const passiveDuringRetirement = sellProductiveAtRetirement ? 0 : passiveAtRetirement;
+
+  // Rendas que chegam sem depender da carteira. A renda passiva é tratada como
+  // constante em termos reais durante a aposentadoria — premissa conservadora.
+  const supplementalIncome = otherMonthlyIncome + passiveDuringRetirement;
 
   const sustainableIncome = sustainableWithdrawal({
     balance: balanceAtRetirement,
@@ -318,7 +383,7 @@ export function project(input) {
     legacy,
   });
 
-  const neededFromPortfolio = Math.max(0, desiredMonthlyIncome - otherMonthlyIncome);
+  const neededFromPortfolio = Math.max(0, desiredMonthlyIncome - supplementalIncome);
 
   const targetBalance = requiredBalance({
     monthlyIncome: neededFromPortfolio,
@@ -327,15 +392,20 @@ export function project(input) {
     legacy,
   });
 
+  // O alvo é de carteira; se o bem for vendido, parte dele já vem da venda.
+  const targetFromContributions =
+    targetBalance - (sellProductiveAtRetirement ? productiveAtRetirement : 0);
+
   const requiredMonthlyContribution = solveMonthlyContribution({
     initialBalance,
     monthlyRate: accumulationRate,
     months: accumulationMonths,
-    targetBalance,
+    targetBalance: targetFromContributions,
     contributionGrowth,
+    extraContribution: reinvested,
+    extraGrowth: productiveRate,
   });
 
-  // Curva efetivamente exibida: o que o plano atual sustenta.
   const retirementProjection = decumulate({
     balance: balanceAtRetirement,
     monthlyRate: retirementRate,
@@ -343,13 +413,20 @@ export function project(input) {
     monthlyWithdrawal: sustainableIncome,
   });
 
-  // Cenário alternativo: e se o usuário insistir em retirar a renda desejada?
   const desiredProjection = decumulate({
     balance: balanceAtRetirement,
     monthlyRate: retirementRate,
     months: retirementMonths,
     monthlyWithdrawal: neededFromPortfolio,
   });
+
+  // Valor do bem mês a mês: cresce sempre; zera na venda ao se aposentar.
+  const productiveSeries = [];
+  for (let month = 0; month <= accumulationMonths + retirementMonths; month++) {
+    const value = productiveAssets * Math.pow(1 + productiveRate, month);
+    const sold = sellProductiveAtRetirement && month > accumulationMonths;
+    productiveSeries.push(sold ? 0 : value);
+  }
 
   const gap = targetBalance - balanceAtRetirement;
 
@@ -367,12 +444,21 @@ export function project(input) {
     realAccumulationReturn: realAnnualRate(accumulationReturn, inflation),
     realRetirementReturn: realAnnualRate(retirementReturn, inflation),
 
+    portfolioAtRetirement,
     balanceAtRetirement,
     totalContributed: accumulation.totalContributed,
-    investmentGrowth: balanceAtRetirement - initialBalance - accumulation.totalContributed,
+    totalPassiveReinvested: accumulation.totalExtra,
+    investmentGrowth:
+      portfolioAtRetirement - initialBalance - accumulation.totalContributed - accumulation.totalExtra,
+
+    productiveAtRetirement,
+    passiveAtRetirement,
+    passiveDuringRetirement,
+    supplementalIncome,
+    productiveAtEnd: productiveSeries[productiveSeries.length - 1],
 
     sustainableIncome,
-    projectedMonthlyIncome: sustainableIncome + otherMonthlyIncome,
+    projectedMonthlyIncome: sustainableIncome + supplementalIncome,
     desiredMonthlyIncome,
     neededFromPortfolio,
 
@@ -384,12 +470,14 @@ export function project(input) {
 
     depletionAge: depletionAge(retirementAge, desiredProjection.depletionMonth),
     legacyAtEnd: retirementProjection.finalBalance,
+    estateAtEnd: retirementProjection.finalBalance + productiveSeries[productiveSeries.length - 1],
 
     balanceSeries: [...accumulation.series, ...retirementProjection.series.slice(1)],
+    productiveSeries,
     // Fluxo de caixa alinhado a `balanceSeries`: positivo é aporte, negativo é
     // retirada. Permite separar aporte de rendimento sem refazer a simulação.
     flowSeries: [
-      ...accumulation.contributions,
+      ...accumulation.contributions.map((value, month) => value + accumulation.extras[month]),
       ...retirementProjection.withdrawals.slice(1).map((value) => -value),
     ],
   };
