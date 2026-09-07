@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Calculadora de Aposentadoria — PriceSoft</title>
+    <meta
+      name="description"
+      content="Projete seu patrimônio, a renda mensal sustentável na aposentadoria e o aporte necessário para chegar lá, tudo em valores de hoje."
+    />
+    <link rel="stylesheet" href="assets/styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%8F%96%3C/text%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <div class="page">
+      <header class="page-header">
+        <h1>Calculadora de aposentadoria</h1>
+        <p>
+          Descubra quanto você terá, que renda mensal esse patrimônio sustenta e quanto precisa
+          aportar para alcançar a renda que deseja. Todos os valores são apresentados em
+          <strong>poder de compra de hoje</strong> — a inflação já está descontada.
+        </p>
+      </header>
+
+      <div class="layout">
+        <!-- ---------- Entradas ---------- -->
+        <form class="panel form-panel" id="plan-form" novalidate>
+          <div class="errors" id="errors" role="alert" hidden>
+            <ul id="error-list"></ul>
+          </div>
+
+          <fieldset>
+            <legend>Seu perfil</legend>
+
+            <div class="field">
+              <label for="currentAge">Idade atual</label>
+              <div class="input-wrap">
+                <input id="currentAge" name="currentAge" type="number" min="0" max="110" step="1" value="30" />
+                <span class="affix">anos</span>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="retirementAge">Quero me aposentar aos</label>
+              <div class="input-wrap">
+                <input id="retirementAge" name="retirementAge" type="number" min="1" max="110" step="1" value="65" />
+                <span class="affix">anos</span>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="endAge">A renda precisa durar até os</label>
+              <div class="input-wrap">
+                <input id="endAge" name="endAge" type="number" min="2" max="120" step="1" value="90" />
+                <span class="affix">anos</span>
+              </div>
+              <span class="hint">Use uma expectativa de vida conservadora — sobreviver ao dinheiro é o risco.</span>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Acumulação</legend>
+
+            <div class="field">
+              <label for="initialBalance">Patrimônio já investido</label>
+              <div class="input-wrap">
+                <span class="affix">R$</span>
+                <input id="initialBalance" name="initialBalance" type="number" min="0" step="1000" value="50000" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="monthlyContribution">Aporte mensal</label>
+              <div class="input-wrap">
+                <span class="affix">R$</span>
+                <input
+                  id="monthlyContribution"
+                  name="monthlyContribution"
+                  type="number"
+                  min="0"
+                  step="100"
+                  value="1500"
+                />
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="checkbox" for="indexContribution">
+                <input id="indexContribution" name="indexContribution" type="checkbox" checked />
+                <span>Corrijo o aporte pela inflação todo ano</span>
+              </label>
+              <span class="hint">
+                Sem correção, o aporte perde poder de compra e o patrimônio final cai.
+              </span>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Premissas de mercado</legend>
+
+            <div class="field">
+              <label for="accumulationReturn">Rentabilidade até me aposentar</label>
+              <div class="input-wrap">
+                <input
+                  id="accumulationReturn"
+                  name="accumulationReturn"
+                  type="number"
+                  min="-20"
+                  max="40"
+                  step="0.25"
+                  value="9"
+                />
+                <span class="affix">% a.a. nominal</span>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="retirementReturn">Rentabilidade depois de aposentado</label>
+              <div class="input-wrap">
+                <input
+                  id="retirementReturn"
+                  name="retirementReturn"
+                  type="number"
+                  min="-20"
+                  max="40"
+                  step="0.25"
+                  value="6"
+                />
+                <span class="affix">% a.a. nominal</span>
+              </div>
+              <span class="hint">Costuma ser menor: a carteira fica mais conservadora.</span>
+            </div>
+
+            <div class="field">
+              <label for="inflation">Inflação esperada</label>
+              <div class="input-wrap">
+                <input id="inflation" name="inflation" type="number" min="-5" max="40" step="0.25" value="4" />
+                <span class="affix">% a.a.</span>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Sua meta</legend>
+
+            <div class="field">
+              <label for="desiredMonthlyIncome">Renda mensal desejada</label>
+              <div class="input-wrap">
+                <span class="affix">R$</span>
+                <input
+                  id="desiredMonthlyIncome"
+                  name="desiredMonthlyIncome"
+                  type="number"
+                  min="0"
+                  step="500"
+                  value="8000"
+                />
+              </div>
+              <span class="hint">Em valores de hoje, somando todas as fontes.</span>
+            </div>
+
+            <div class="field">
+              <label for="otherMonthlyIncome">Outras rendas (INSS, aluguel…)</label>
+              <div class="input-wrap">
+                <span class="affix">R$</span>
+                <input
+                  id="otherMonthlyIncome"
+                  name="otherMonthlyIncome"
+                  type="number"
+                  min="0"
+                  step="500"
+                  value="2000"
+                />
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="legacy">Quero deixar de herança</label>
+              <div class="input-wrap">
+                <span class="affix">R$</span>
+                <input id="legacy" name="legacy" type="number" min="0" step="10000" value="0" />
+              </div>
+            </div>
+          </fieldset>
+
+          <div class="form-actions">
+            <button type="reset" id="reset">Restaurar valores padrão</button>
+          </div>
+        </form>
+
+        <!-- ---------- Resultados ---------- -->
+        <div class="results" id="results" aria-live="polite">
+          <section class="panel verdict" id="verdict">
+            <h2 id="verdict-title"></h2>
+            <p id="verdict-detail"></p>
+          </section>
+
+          <div class="cards">
+            <article class="panel card" id="card-income">
+              <span class="card-label">Renda mensal projetada</span>
+              <span class="card-value" id="value-income"></span>
+              <span class="card-note" id="note-income"></span>
+            </article>
+
+            <article class="panel card">
+              <span class="card-label">Patrimônio ao se aposentar</span>
+              <span class="card-value" id="value-balance"></span>
+              <span class="card-note" id="note-balance"></span>
+            </article>
+
+            <article class="panel card">
+              <span class="card-label">Patrimônio necessário</span>
+              <span class="card-value" id="value-target"></span>
+              <span class="card-note" id="note-target"></span>
+            </article>
+
+            <article class="panel card" id="card-contribution">
+              <span class="card-label">Aporte mensal necessário</span>
+              <span class="card-value" id="value-contribution"></span>
+              <span class="card-note" id="note-contribution"></span>
+            </article>
+          </div>
+
+          <section class="panel chart-panel">
+            <div class="section-head">
+              <h2>Evolução do patrimônio</h2>
+              <div class="legend">
+                <span><i></i> Acumulação</span>
+                <span><i class="swatch-retire"></i> Aposentadoria</span>
+              </div>
+            </div>
+            <svg
+              class="chart"
+              id="chart"
+              viewBox="0 0 860 320"
+              role="img"
+              aria-labelledby="chart-title"
+            >
+              <title id="chart-title">
+                Gráfico do saldo acumulado ao longo da vida. Os mesmos números estão na tabela
+                ano a ano abaixo.
+              </title>
+            </svg>
+            <p class="footnote" id="chart-note"></p>
+          </section>
+
+          <section class="panel breakdown">
+            <div class="section-head">
+              <h2>De onde vem o patrimônio</h2>
+            </div>
+            <div class="stack-bar" id="stack-bar" aria-hidden="true">
+              <span class="seg-initial" id="seg-initial"></span>
+              <span class="seg-contributed" id="seg-contributed"></span>
+              <span class="seg-growth" id="seg-growth"></span>
+            </div>
+            <dl class="breakdown-list">
+              <div>
+                <dt data-seg="initial">Já investido</dt>
+                <dd id="value-initial"></dd>
+              </div>
+              <div>
+                <dt data-seg="contributed">Aportes futuros</dt>
+                <dd id="value-contributed"></dd>
+              </div>
+              <div>
+                <dt data-seg="growth">Rendimentos reais</dt>
+                <dd id="value-growth"></dd>
+              </div>
+            </dl>
+          </section>
+
+          <details class="panel">
+            <summary>Premissas usadas no cálculo</summary>
+            <div class="details-body">
+              <dl class="assumption-list" id="assumptions"></dl>
+            </div>
+          </details>
+
+          <details class="panel">
+            <summary>Projeção ano a ano</summary>
+            <div class="details-body">
+              <div class="table-scroll">
+                <table>
+                  <caption class="visually-hidden">
+                    Saldo, aportes, retiradas e rendimentos em cada ano, em valores de hoje.
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Idade</th>
+                      <th scope="col">Fase</th>
+                      <th scope="col">Aportes / retiradas</th>
+                      <th scope="col">Rendimento real</th>
+                      <th scope="col">Saldo no fim do ano</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <footer class="page-footer">
+        <p>
+          Ferramenta educativa de planejamento. As projeções assumem rentabilidade constante e não
+          consideram impostos, taxas de administração ou mudanças de regra da previdência — os
+          resultados reais vão variar. Não constitui recomendação de investimento.
+        </p>
+      </footer>
+    </div>
+
+    <script type="module" src="src/app.js"></script>
+  </body>
+</html>

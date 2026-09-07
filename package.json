@@ -1,0 +1,15 @@
+{
+  "name": "pricesoft-calculadora-aposentadoria",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Calculadora de aposentadoria: projeta patrim\u00f4nio, renda mensal sustent\u00e1vel e aporte necess\u00e1rio em moeda de hoje.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "start": "node scripts/serve.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}
