@@ -563,9 +563,12 @@ button:focus-visible {
   margin: 0;
 }
 
+/* Itens de grade esticam à altura da linha, então ancorar o valor na base
+   alinha todos mesmo quando um rótulo quebra em duas linhas. */
 .breakdown-list div {
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   gap: 3px;
 }
 
