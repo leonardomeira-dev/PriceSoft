@@ -33,6 +33,16 @@ const percent = new Intl.NumberFormat('pt-BR', {
 /** Formata um valor monetário, protegendo contra resultados não finitos. */
 const money = (value) => (Number.isFinite(value) ? currency.format(value) : '—');
 
+/**
+ * Formata exigências e faltas arredondando para cima.
+ *
+ * Os valores são exibidos sem centavos. Arredondar um requisito para o mais
+ * próximo o deixa abaixo do necessário quase metade das vezes — quem digitasse
+ * de volta o aporte sugerido veria a calculadora dizer que ainda falta dinheiro.
+ * Para cima, seguir a recomendação sempre fecha a conta.
+ */
+const moneyUp = (value) => (Number.isFinite(value) ? currency.format(Math.ceil(value)) : '—');
+
 /** Formata uma quantidade de anos com a concordância correta. */
 const years = (count) => `${count} ${count === 1 ? 'ano' : 'anos'}`;
 
@@ -468,7 +478,7 @@ function renderVerdict(result, plan) {
   }
 
   verdict.dataset.status = 'short';
-  text('verdict-title', `Faltam ${money(result.gap)} de patrimônio`);
+  text('verdict-title', `Faltam ${moneyUp(result.gap)} de patrimônio`);
 
   const depletion =
     result.depletionAge === null
@@ -476,8 +486,8 @@ function renderVerdict(result, plan) {
       : ` Mantendo a retirada desejada, o dinheiro acabaria aos ${Math.floor(result.depletionAge)} anos.`;
 
   const fix = Number.isFinite(result.requiredMonthlyContribution)
-    ? `Aportar ${money(result.requiredMonthlyContribution)} por mês ` +
-      `(${money(result.additionalMonthlyContribution)} a mais) fecha a conta.`
+    ? `Aportar ${moneyUp(result.requiredMonthlyContribution)} por mês ` +
+      `(${moneyUp(result.additionalMonthlyContribution)} a mais) fecha a conta.`
     : 'Com um retorno real nulo ou negativo, só aumentar o aporte não resolve: reveja as premissas.';
 
   text(
@@ -507,22 +517,22 @@ function renderCards(result, plan) {
       : `Em ${years(plan.retirementAge - plan.currentAge)}, em valores de hoje`,
   );
 
-  text('value-target', money(result.targetBalance));
+  text('value-target', moneyUp(result.targetBalance));
   text(
     'note-target',
     result.onTrack
       ? `Sobra de ${money(-result.gap)}`
-      : `Faltam ${money(result.gap)}`,
+      : `Faltam ${moneyUp(result.gap)}`,
   );
 
   const contributionCard = document.getElementById('card-contribution');
   contributionCard.dataset.tone = result.onTrack ? 'good' : 'short';
-  text('value-contribution', money(result.requiredMonthlyContribution));
+  text('value-contribution', moneyUp(result.requiredMonthlyContribution));
   text(
     'note-contribution',
     result.onTrack
       ? `Você já aporta ${money(plan.monthlyContribution)}`
-      : `${money(result.additionalMonthlyContribution)} a mais do que hoje`,
+      : `${moneyUp(result.additionalMonthlyContribution)} a mais do que hoje`,
   );
 }
 

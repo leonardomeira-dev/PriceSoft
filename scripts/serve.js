@@ -62,6 +62,19 @@ const server = createServer(async (request, response) => {
   }
 });
 
+// Sem este tratamento o Node lança um 'error' não capturado e o processo morre
+// com um stack trace, escondendo a única coisa que importa: a porta está ocupada.
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(
+      `A porta ${PORT} já está em uso. Encerre o outro servidor ou escolha outra porta:\n` +
+        `  PORT=8081 npm start`,
+    );
+    process.exit(1);
+  }
+  throw error;
+});
+
 server.listen(PORT, () => {
   console.log(`Calculadora de aposentadoria em http://localhost:${PORT}`);
 });
